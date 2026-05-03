@@ -2,9 +2,11 @@ const express = require("express");
 const path = require("path");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
 const {
   db,
   initDb,
+  queueSupabaseSync,
   BREAD_TYPES,
   THRESHOLD,
   getSeverity,
@@ -15,10 +17,29 @@ const {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_VERCEL = Boolean(process.env.VERCEL);
 const JWT_SECRET = process.env.JWT_SECRET || "bakery_control_secret_change_me";
 const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || "BIGCAT-ADMIN-2026";
+const ALERT_EMAIL_TO = process.env.ALERT_EMAIL_TO || "";
 
-initDb();
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && ALERT_EMAIL_TO);
+const alertTransport = smtpConfigured
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number.isFinite(smtpPort) ? smtpPort : 587,
+      secure: smtpPort === 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+  : null;
+
+const dbReady = initDb().catch((error) => {
+  console.error("Database initialization failed:", error);
+  throw error;
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public"), {
@@ -28,6 +49,15 @@ app.use(express.static(path.join(__dirname, "..", "public"), {
     }
   },
 }));
+
+app.use(async (_req, _res, next) => {
+  try {
+    await dbReady;
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 function badRequest(res, message) {
   return res.status(400).json({ error: message });
@@ -76,6 +106,51 @@ function createUserSafe(row) {
     phone: row.phone,
     role: row.role,
   };
+}
+
+function toCsvCell(value) {
+  if (value === null || value === undefined) return "";
+  const text = String(value);
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function rowsToCsv(headers, rows) {
+  const head = headers.map((h) => toCsvCell(h)).join(",");
+  const lines = rows.map((row) => row.map((value) => toCsvCell(value)).join(","));
+  return `${[head, ...lines].join("\n")}\n`;
+}
+
+function maybeSendCriticalAlertEmail(payload) {
+  if (!alertTransport || payload?.severity !== "critical") {
+    return;
+  }
+
+  const occurredAt = payload.createdAt || new Date().toISOString();
+  const subject = `CRITICAL ALERT: ${payload.stage} discrepancy (${payload.breadType})`;
+  const text = [
+    "BigCat Bakery Critical Discrepancy Alert",
+    "",
+    `Stage: ${payload.stage}`,
+    `Bread Type: ${payload.breadType}`,
+    `Difference: ${payload.difference}`,
+    `Severity: ${payload.severity}`,
+    `Staff: ${payload.staffName || "Unknown"} (${payload.staffRole || "unknown"})`,
+    `Time: ${occurredAt}`,
+  ].join("\n");
+
+  alertTransport
+    .sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: ALERT_EMAIL_TO,
+      subject,
+      text,
+    })
+    .catch((error) => {
+      console.error("Critical alert email failed:", error.message);
+    });
 }
 
 app.post("/api/auth/admin-login", (req, res) => {
@@ -242,6 +317,17 @@ app.post("/api/production", authRequired, roleRequired("baker"), (req, res) => {
     .prepare("SELECT created_at FROM production_logs WHERE id = ?")
     .get(info.lastInsertRowid).created_at;
 
+  maybeSendCriticalAlertEmail({
+    stage: "production",
+    breadType,
+    difference,
+    severity,
+    staffName: req.user.name,
+    staffRole: req.user.role,
+    createdAt,
+  });
+  queueSupabaseSync();
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -291,6 +377,17 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), (req, res) => {
 
   const createdAt = db.prepare("SELECT created_at FROM bagging_logs WHERE id = ?").get(info.lastInsertRowid)
     .created_at;
+
+  maybeSendCriticalAlertEmail({
+    stage: "bagging",
+    breadType,
+    difference,
+    severity,
+    staffName: req.user.name,
+    staffRole: req.user.role,
+    createdAt,
+  });
+  queueSupabaseSync();
 
   res.status(201).json({
     id: info.lastInsertRowid,
@@ -365,6 +462,17 @@ app.post("/api/sales", authRequired, roleRequired("sales"), (req, res) => {
   const createdAt = db.prepare("SELECT created_at FROM sales_logs WHERE id = ?").get(info.lastInsertRowid)
     .created_at;
 
+  maybeSendCriticalAlertEmail({
+    stage: "sales",
+    breadType,
+    difference,
+    severity,
+    staffName: req.user.name,
+    staffRole: req.user.role,
+    createdAt,
+  });
+  queueSupabaseSync();
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -418,6 +526,17 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), (req, res) => 
     .prepare("SELECT created_at FROM delivery_logs WHERE id = ?")
     .get(info.lastInsertRowid).created_at;
 
+  maybeSendCriticalAlertEmail({
+    stage: "delivery",
+    breadType,
+    difference,
+    severity,
+    staffName: req.user.name,
+    staffRole: req.user.role,
+    createdAt,
+  });
+  queueSupabaseSync();
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -469,6 +588,7 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => 
   const created = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?")
     .get(info.lastInsertRowid);
+  queueSupabaseSync();
 
   res.status(201).json({ user: created });
 });
@@ -489,6 +609,7 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), (req, re
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
   db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  queueSupabaseSync();
   res.json({ deleted: id });
 });
 
@@ -780,6 +901,64 @@ app.get("/api/admin/alerts", authRequired, roleRequired("admin"), (req, res) => 
   res.json({ alerts: rows });
 });
 
+app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res) => {
+  const { start, end, day } = toDateBounds(req.query.date);
+
+  const rows = db
+    .prepare(
+      `SELECT * FROM (
+       SELECT 'baker' AS stage, u.name AS staff_name, p.bread_type, p.created_at,
+              p.produced_count AS quantity, p.difference, p.severity
+       FROM production_logs p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.created_at BETWEEN ? AND ?
+
+       UNION ALL
+
+       SELECT 'bagger' AS stage, u.name AS staff_name, b.bread_type, b.created_at,
+              b.bagged_count AS quantity, b.difference, b.severity
+       FROM bagging_logs b
+       JOIN users u ON u.id = b.user_id
+       WHERE b.created_at BETWEEN ? AND ?
+
+       UNION ALL
+
+       SELECT 'sales' AS stage, u.name AS staff_name, s.bread_type, s.created_at,
+              s.total_sold AS quantity, s.difference, s.severity
+       FROM sales_logs s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.created_at BETWEEN ? AND ?
+
+       UNION ALL
+
+       SELECT 'delivery' AS stage, u.name AS staff_name, d.bread_type, d.created_at,
+              d.total_delivered AS quantity, d.difference, d.severity
+       FROM delivery_logs d
+       JOIN users u ON u.id = d.user_id
+       WHERE d.created_at BETWEEN ? AND ?
+          ) AS export_rows
+          ORDER BY export_rows.created_at DESC`
+    )
+    .all(start, end, start, end, start, end, start, end);
+
+  const csv = rowsToCsv(
+    ["date", "stage", "staff", "bread_type", "quantity", "difference", "severity"],
+    rows.map((row) => [
+      row.created_at,
+      row.stage,
+      row.staff_name,
+      row.bread_type,
+      row.quantity,
+      row.difference,
+      row.severity || "ok",
+    ])
+  );
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="bigcat-report-${day}.csv"`);
+  res.send(csv);
+});
+
 app.patch("/api/admin/adjust/:table/:id", authRequired, roleRequired("admin"), (req, res) => {
   const table = String(req.params.table || "");
   const id = Number(req.params.id);
@@ -862,6 +1041,7 @@ app.patch("/api/admin/adjust/:table/:id", authRequired, roleRequired("admin"), (
   });
 
   tx();
+  queueSupabaseSync();
 
   res.json({
     message: "Adjustment applied",
@@ -920,10 +1100,45 @@ app.get("/api/staff/my-submissions", authRequired, (req, res) => {
   res.json({ production, bagging, sales, delivery });
 });
 
+app.get("/api/admin/all-submissions", authRequired, (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ error: "Admins only" });
+  }
+  const production = db
+    .prepare(
+      `SELECT id, bread_type, produced_count, expected_output, difference, created_at, user_id
+       FROM production_logs ORDER BY created_at DESC`
+    )
+    .all();
+  const bagging = db
+    .prepare(
+      `SELECT id, bread_type, received_count, bagged_count, difference, created_at, user_id
+       FROM bagging_logs ORDER BY created_at DESC`
+    )
+    .all();
+  const sales = db
+    .prepare(
+      `SELECT id, bread_type, received_for_sales, total_sold, difference, created_at, user_id
+       FROM sales_logs ORDER BY created_at DESC`
+    )
+    .all();
+  const delivery = db
+    .prepare(
+      `SELECT id, bread_type, taken_count, total_delivered, difference, created_at, user_id
+       FROM delivery_logs ORDER BY created_at DESC`
+    )
+    .all();
+  res.json({ production, bagging, sales, delivery });
+});
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`Bakery control system running on http://localhost:${PORT}`);
-});
+if (!IS_VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Bakery control system running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

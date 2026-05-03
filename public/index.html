@@ -126,6 +126,24 @@
             <h3>My Recent Submissions</h3>
             <div id="mySubmissions" class="scroll-table"></div>
           </article>
+
+          <article id="batchHistoryCard" class="card" data-nav-label="Batch History">
+            <h3>30-Day Batch History</h3>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: 0.85rem;">
+                From
+                <input id="historyFromDate" type="date" style="width: auto; height: 2.1rem; font-size: 0.8rem; padding: 0 0.5rem;" />
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-weight: 600; font-size: 0.85rem;">
+                Bread Type
+                <select id="historyBreadType" style="width: 120px; height: 2.1rem; font-size: 0.8rem; padding: 0 0.5rem;">
+                  <option value="">All Types</option>
+                </select>
+              </label>
+              <button id="applyHistoryFilter" style="width: auto; height: 2.1rem; padding: 0 1rem; font-size: 0.8rem;">Filter</button>
+            </div>
+            <div id="batchHistory" class="scroll-table"></div>
+          </article>
         </section>
 
         <section id="adminPanel" class="hidden">
@@ -161,7 +179,10 @@
               </label>
             </div>
             <p class="muted">Automatic timestamping is used for all submissions. Staff do not enter date/time.</p>
-            <button id="refreshAdminBtn">Refresh Submissions</button>
+            <div class="row-between" style="gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
+              <button id="refreshAdminBtn">Refresh Submissions</button>
+              <button id="exportCsvBtn" type="button" class="ghost">Export CSV</button>
+            </div>
             <div id="adminCounts" class="admin-counts"></div>
             <div id="alertSummary" class="admin-alert-summary"></div>
             <div id="topDiscrepancies" class="top-discrepancies"></div>

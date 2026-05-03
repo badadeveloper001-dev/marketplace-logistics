@@ -4,3 +4,5 @@ bakery.db
 bakery.db-shm
 bakery.db-wal
 npm-debug.log*
+.vercel
+.env*.local

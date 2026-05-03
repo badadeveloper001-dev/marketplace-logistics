@@ -36,6 +36,7 @@ const el = {
   createStaffForm: document.getElementById("createStaffForm"),
   staffList: document.getElementById("staffList"),
   refreshAdminBtn: document.getElementById("refreshAdminBtn"),
+  exportCsvBtn: document.getElementById("exportCsvBtn"),
   reportDate: document.getElementById("reportDate"),
   adminCounts: document.getElementById("adminCounts"),
   alertSummary: document.getElementById("alertSummary"),
@@ -48,6 +49,11 @@ const el = {
   baggerSubmissionsTable: document.getElementById("baggerSubmissionsTable"),
   salesSubmissionsTable: document.getElementById("salesSubmissionsTable"),
   deliverySubmissionsTable: document.getElementById("deliverySubmissionsTable"),
+  batchHistoryCard: document.getElementById("batchHistoryCard"),
+  batchHistory: document.getElementById("batchHistory"),
+  historyFromDate: document.getElementById("historyFromDate"),
+  historyBreadType: document.getElementById("historyBreadType"),
+  applyHistoryFilter: document.getElementById("applyHistoryFilter"),
 };
 
 function showToast(message) {
@@ -96,13 +102,13 @@ function renderFormsByRole() {
       <label>Flour Bags Used<input name="flourBags" type="number" min="0" step="0.01" required /></label>
       <label>Breads Produced<input name="producedCount" type="number" min="0" step="1" required /></label>
       <h4 class="form-section-title span-2">Ingredient Inputs</h4>
-      <label>Sugar Used<input name="sugar" type="number" min="0" step="0.01" required /></label>
-      <label>Salt Used<input name="salt" type="number" min="0" step="0.01" required /></label>
-      <label>Preservative Used<input name="preservative" type="number" min="0" step="0.01" required /></label>
-      <label>Butter Used<input name="butter" type="number" min="0" step="0.01" required /></label>
-      <label>Yeast Used<input name="yeast" type="number" min="0" step="0.01" required /></label>
-      <label>Vegetable Oil Used<input name="vegetableOil" type="number" min="0" step="0.01" required /></label>
-      <label>Improver Used<input name="improver" type="number" min="0" step="0.01" required /></label>
+      <label>Sugar Used (kg)<input name="sugar" type="number" min="0" step="0.01" required /></label>
+      <label>Salt Used (kg)<input name="salt" type="number" min="0" step="0.01" required /></label>
+      <label>Preservative Used (grams)<input name="preservative" type="number" min="0" step="0.01" required /></label>
+      <label>Butter Used (kg)<input name="butter" type="number" min="0" step="0.01" required /></label>
+      <label>Yeast Used (grams)<input name="yeast" type="number" min="0" step="0.01" required /></label>
+      <label>Vegetable Oil Used (litres)<input name="vegetableOil" type="number" min="0" step="0.01" required /></label>
+      <label>Improver Used (grams)<input name="improver" type="number" min="0" step="0.01" required /></label>
       <button type="submit">Submit Production</button>
       <div id="bakerPreview" class="staff-preview hidden"></div>
     `;
@@ -813,6 +819,40 @@ async function boot() {
     }
   };
 
+  if (el.exportCsvBtn) {
+    el.exportCsvBtn.onclick = () => {
+      const date = el.reportDate.value || new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams({ date });
+      const a = document.createElement("a");
+      a.href = `/api/admin/export-csv?${params.toString()}`;
+      a.download = `bigcat-report-${date}.csv`;
+      if (state.token) {
+        // Use authenticated fetch to include bearer token, then trigger browser download.
+        fetch(a.href, { headers: { Authorization: `Bearer ${state.token}` } })
+          .then((response) => {
+            if (!response.ok) {
+              return response.json().then((payload) => {
+                throw new Error(payload.error || "Export failed");
+              });
+            }
+            return response.blob();
+          })
+          .then((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = a.download;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            showToast("CSV export downloaded");
+          })
+          .catch((error) => showToast(error.message));
+      }
+    };
+  }
+
   el.adminPanel.onclick = async (event) => {
     const button = event.target.closest("button[data-filter-role][data-filter-value]");
     if (!button) return;
@@ -851,6 +891,62 @@ async function boot() {
   }
 }
 
+async function loadBatchHistory() {
+  const fromDate = el.historyFromDate.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const breadType = el.historyBreadType.value;
+  
+  try {
+    const endpoint = state.user.role === "admin" ? "/api/admin/all-submissions" : "/api/staff/my-submissions";
+    const data = await api(endpoint);
+    let allSubmissions = [];
+    
+    // Combine all submission types with role labels
+    (data.production || []).forEach(row => {
+      allSubmissions.push({ ...row, stage: '🍞 Baker', type: 'production' });
+    });
+    (data.bagging || []).forEach(row => {
+      allSubmissions.push({ ...row, stage: '📦 Bagger', type: 'bagging' });
+    });
+    (data.sales || []).forEach(row => {
+      allSubmissions.push({ ...row, stage: '🏪 Sales', type: 'sales' });
+    });
+    (data.delivery || []).forEach(row => {
+      allSubmissions.push({ ...row, stage: '🚚 Delivery', type: 'delivery' });
+    });
+    
+    // Filter by date and bread type
+    let filtered = allSubmissions.filter(row => {
+      const rowDate = row.created_at.slice(0, 10);
+      const matchDate = rowDate >= fromDate;
+      const matchType = !breadType || row.bread_type === breadType;
+      return matchDate && matchType;
+    });
+    
+    // Sort by date descending
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    if (!filtered.length) {
+      el.batchHistory.innerHTML = '<p class="muted" style="padding:1rem">No submissions in this period.</p>';
+      return;
+    }
+    
+    el.batchHistory.innerHTML = `<table>
+      <thead><tr>
+        <th>Date</th><th>Stage</th><th>Bread Type</th><th>Quantity</th><th>Difference</th>
+      </tr></thead>
+      <tbody>${filtered.map(row => `<tr>
+        <td>${row.created_at.slice(0, 10)}</td>
+        <td>${row.stage}</td>
+        <td>${row.bread_type}</td>
+        <td>${row.produced_count || row.bagged_count || row.total_sold || row.total_delivered || '—'}</td>
+        <td style="font-weight:600;color:${row.difference > 0 ? '#dc2626' : '#15803d'}">${row.difference > 0 ? '+' : ''}${row.difference}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (err) {
+    el.batchHistory.innerHTML = `<p class="muted" style="padding:1rem">Error loading history: ${err.message}</p>`;
+  }
+}
+
 async function afterAuth() {
   const meta = await api("/api/meta");
   state.breadTypes = meta.breadTypes;
@@ -878,14 +974,34 @@ async function afterAuth() {
     } catch (error) {
       showToast(error.message || "Unable to load admin submissions");
     }
-    return;
+  } else {
+    renderFormsByRole();
   }
-
-  renderFormsByRole();
-  try {
-    await hydrateStaffPreviewFromHistory();
-  } catch (_error) {
-    // Keep UI usable even if preview history cannot be fetched.
+  
+  // Setup batch history for both staff and admins
+  el.batchHistoryCard.classList.remove("hidden");
+  // Populate bread type dropdown if not already populated
+  if (!el.historyBreadType.querySelector("option[value='Jumbo']")) {
+    Object.keys(state.breadTypes).forEach(breadType => {
+      const option = document.createElement("option");
+      option.value = breadType;
+      option.textContent = breadType;
+      el.historyBreadType.appendChild(option);
+    });
+  }
+  // Set default date to 30 days ago
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  el.historyFromDate.value = thirtyDaysAgo;
+  // Load initial history and wire up filter
+  await loadBatchHistory();
+  el.applyHistoryFilter.onclick = () => loadBatchHistory();
+  
+  if (state.user.role !== "admin") {
+    try {
+      await hydrateStaffPreviewFromHistory();
+    } catch (_error) {
+      // Keep UI usable even if preview history cannot be fetched.
+    }
   }
 }
 

@@ -21,8 +21,11 @@ No manual staff name entry is used anywhere.
 - Bagger, Sales, and Delivery stage submissions
 - Automatic discrepancy detection with threshold logic
 - Admin-only alerts, summaries, daily report, and adjustments
+- One-click admin CSV export for the selected report date
 - Staff submission history (read-only for staff)
 - Financial loss calculation from missing loaves by bread type pricing
+- Critical discrepancy email notifications (SMTP)
+- Optional Supabase PostgreSQL persistence sync for production durability
 - Mobile-first, fast input dashboard UI
 
 ## Bread Types And Prices
@@ -61,7 +64,9 @@ Discrepancy threshold:
 - Node.js
 - Express
 - SQLite via better-sqlite3
+- PostgreSQL (Supabase) sync via pg
 - JWT authentication
+- Nodemailer (SMTP alerts)
 - Vanilla HTML/CSS/JS frontend
 
 ## Run Locally
@@ -191,6 +196,7 @@ Admin:
 - GET /api/admin/staff-accountability
 - GET /api/admin/daily-report
 - GET /api/admin/alerts
+- GET /api/admin/export-csv
 - PATCH /api/admin/adjust/:table/:id
 - GET /api/admin/adjustments
 
@@ -198,3 +204,17 @@ Admin:
 
 - Use a strong JWT_SECRET in production.
 - Seed passwords are for local development only.
+
+## Production Environment Variables
+
+- JWT_SECRET: required, long random secret
+- ADMIN_ACCESS_CODE: required, admin portal code
+- ALERT_EMAIL_TO: comma-separated recipients for critical alerts
+- SMTP_HOST: SMTP host for alert delivery
+- SMTP_PORT: SMTP port (for example 587 or 465)
+- SMTP_USER: SMTP username
+- SMTP_PASS: SMTP password or app password
+- SMTP_FROM: optional from address (defaults to SMTP_USER)
+- DATABASE_URL or SUPABASE_DB_URL: optional Supabase PostgreSQL connection string for persistent sync
+
+If DATABASE_URL/SUPABASE_DB_URL is set, the app initializes SQLite locally and synchronizes all operational tables to Supabase so data survives serverless restarts.

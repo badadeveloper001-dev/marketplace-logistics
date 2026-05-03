@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BigCat Bakery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="bg-blob blob-a"></div>
+    <div class="bg-blob blob-b"></div>
+    <div class="bg-grid"></div>
+
+    <main class="app-shell">
+      <section id="loginView" class="login-layout">
+        <aside class="brand-panel">
+          <div class="brand-header">
+            <div class="brand-logo-crop">
+              <img src="/image.png" alt="BigCat Bakery" class="brand-logo-img" />
+            </div>
+            <h1>BigCat Bakery</h1>
+          </div>
+          <p class="eyebrow">Operations Suite</p>
+          <p class="brand-tagline">Track production, ingredients, and staff accountability in one clear control center.</p>
+
+          <div class="feature-pills">
+            <span>Live discrepancy detection</span>
+            <span>Role-based audit trail</span>
+            <span>Daily loss visibility</span>
+          </div>
+
+          <div class="seed-box">
+            <h3>Staff Login</h3>
+            <p>Staff accounts are created by the admin. Use your assigned email and password to sign in.</p>
+          </div>
+        </aside>
+
+        <section class="auth-panel card">
+          <!-- Login tabs -->
+          <div class="login-tabs">
+            <button type="button" class="login-tab active" data-tab="staff">Staff Sign In</button>
+            <button type="button" class="login-tab" data-tab="admin">Admin Portal</button>
+          </div>
+
+          <!-- Staff login -->
+          <div id="staffLoginPane" class="login-pane">
+            <p class="muted" style="margin-bottom:1.25rem">Use your assigned staff email and password.</p>
+            <form id="loginForm" class="form-grid">
+              <label>Email
+                <input type="email" name="email" required autocomplete="email" placeholder="e.g. jane@bakery.com" />
+              </label>
+              <label>Password
+                <input type="password" name="password" required autocomplete="current-password" />
+              </label>
+              <button type="submit">Enter Dashboard</button>
+            </form>
+          </div>
+
+          <!-- Admin portal -->
+          <div id="adminLoginPane" class="login-pane hidden">
+            <div class="admin-portal-badge">
+              <span class="admin-portal-icon">🔐</span>
+              <div>
+                <div class="admin-portal-title">Admin Portal</div>
+                <div class="admin-portal-sub">Restricted access — authorised personnel only</div>
+              </div>
+            </div>
+            <form id="adminLoginForm" class="form-grid" action="#" style="margin-top:1.25rem">
+              <label class="span-2">Access Code
+                <input type="password" name="code" required autocomplete="off" placeholder="Enter your admin access code" />
+              </label>
+              <button type="submit" class="span-2 admin-submit-btn">Access Admin Dashboard</button>
+            </form>
+          </div>
+        </section>
+      </section>
+
+      <section id="appView" class="hidden app-layout">
+        <header class="topbar card topbar-glow">
+          <div class="topbar-left">
+            <div class="topbar-logo-crop">
+              <img src="/image.png" alt="BigCat Bakery" class="topbar-logo-img" />
+            </div>
+              <circle cx="112" cy="92" r="4" fill="currentColor"/>
+              <circle cx="100" cy="104" r="3" fill="currentColor"/>
+            </svg>
+            <div class="user-avatar" id="userAvatar"></div>
+            <div>
+              <div class="topbar-title" id="welcomeTitle"></div>
+              <div class="topbar-sub" id="roleInfo"></div>
+            </div>
+          </div>
+          <button id="logoutBtn" class="ghost">Sign out</button>
+        </header>
+
+        <nav id="quickNav" class="quick-nav card hidden"></nav>
+
+        <section id="staffPanel" class="hidden">
+          <article id="bakerCard" class="card hidden" data-nav-label="Baker Form">
+            <h3>Baker Dashboard</h3>
+            <form id="productionForm" class="form-grid"></form>
+          </article>
+
+          <article id="baggerCard" class="card hidden" data-nav-label="Bagger Form">
+            <h3>Bagger Dashboard</h3>
+            <form id="baggingForm" class="form-grid"></form>
+          </article>
+
+          <article id="salesCard" class="card hidden" data-nav-label="Sales Form">
+            <h3>Sales Dashboard</h3>
+            <form id="salesForm" class="form-grid"></form>
+          </article>
+
+          <article id="deliveryCard" class="card hidden" data-nav-label="Delivery Form">
+            <h3>Delivery Dashboard</h3>
+            <form id="deliveryForm" class="form-grid"></form>
+          </article>
+
+          <article id="mySubmissionsCard" class="card" data-nav-label="My Submissions">
+            <h3>My Recent Submissions</h3>
+            <div id="mySubmissions" class="scroll-table"></div>
+          </article>
+        </section>
+
+        <section id="adminPanel" class="hidden">
+          <article id="staffManagementCard" class="card" data-nav-label="Staff">
+            <h3>Staff Management</h3>
+            <p class="muted">Create staff accounts. Staff will log in with their email and password.</p>
+            <form id="createStaffForm" class="form-grid" style="margin-bottom:1.5rem">
+              <label>Full Name<input name="name" required placeholder="e.g. Jane Doe" /></label>
+              <label>Email Address<input type="email" name="email" required placeholder="e.g. jane@bakery.com" /></label>
+              <label>Phone Number<input name="phone" placeholder="e.g. 08012345678" /></label>
+              <label>Role
+                <select name="role" required>
+                  <option value="">Select role…</option>
+                  <option value="baker">Baker</option>
+                  <option value="bagger">Bagger</option>
+                  <option value="sales">Sales</option>
+                  <option value="delivery">Delivery</option>
+                </select>
+              </label>
+              <label>Password<input type="password" name="password" required placeholder="Min. 6 characters" /></label>
+              <button type="submit">Create Staff Account</button>
+            </form>
+            <h4 style="margin-bottom:0.5rem">Current Staff</h4>
+            <div id="staffList"></div>
+          </article>
+
+          <article id="adminControlsCard" class="card" data-nav-label="Controls">
+            <div class="row-between">
+              <h3>Admin Dashboard</h3>
+              <label class="inline-date">
+                Date
+                <input id="reportDate" type="date" />
+              </label>
+            </div>
+            <p class="muted">Automatic timestamping is used for all submissions. Staff do not enter date/time.</p>
+            <button id="refreshAdminBtn">Refresh Submissions</button>
+            <div id="adminCounts" class="admin-counts"></div>
+            <div id="alertSummary" class="admin-alert-summary"></div>
+            <div id="topDiscrepancies" class="top-discrepancies"></div>
+          </article>
+
+          <article id="bakerSubmissionsCard" class="card" data-nav-label="Baker Submissions">
+            <h3><span class="role-tag baker">🧑‍🍳 Baker</span> Submissions</h3>
+            <div id="bakerFilters" class="admin-filter-bar"></div>
+            <div id="bakerSubmissionsTable" class="scroll-table"></div>
+          </article>
+
+          <article id="baggerSubmissionsCard" class="card" data-nav-label="Bagger Submissions">
+            <h3><span class="role-tag bagger">📦 Bagger</span> Submissions</h3>
+            <div id="baggerFilters" class="admin-filter-bar"></div>
+            <div id="baggerSubmissionsTable" class="scroll-table"></div>
+          </article>
+
+          <article id="salesSubmissionsCard" class="card" data-nav-label="Sales Submissions">
+            <h3><span class="role-tag sales">🏪 Sales</span> Submissions</h3>
+            <div id="salesFilters" class="admin-filter-bar"></div>
+            <div id="salesSubmissionsTable" class="scroll-table"></div>
+          </article>
+
+          <article id="deliverySubmissionsCard" class="card" data-nav-label="Delivery Submissions">
+            <h3><span class="role-tag delivery">🚚 Delivery</span> Submissions</h3>
+            <div id="deliveryFilters" class="admin-filter-bar"></div>
+            <div id="deliverySubmissionsTable" class="scroll-table"></div>
+          </article>
+        </section>
+      </section>
+
+      <section id="toast" class="toast hidden"></section>
+    </main>
+
+    <script src="/app.js?v=2"></script>
+  </body>
+</html>

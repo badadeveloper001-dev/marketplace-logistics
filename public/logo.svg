@@ -1,0 +1,38 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Lion head mane (outer circles) -->
+  <circle cx="100" cy="60" r="35" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Top left mane arc -->
+  <path d="M 70 45 Q 55 35 50 55 Q 48 70 65 75" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Top right mane arc -->
+  <path d="M 130 45 Q 145 35 150 55 Q 152 70 135 75" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Left side mane -->
+  <path d="M 65 75 Q 45 80 42 100 Q 42 120 58 130" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Right side mane -->
+  <path d="M 135 75 Q 155 80 158 100 Q 158 120 142 130" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Bottom left mane -->
+  <path d="M 58 130 Q 50 150 65 160" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Bottom right mane -->
+  <path d="M 142 130 Q 150 150 135 160" fill="none" stroke="currentColor" stroke-width="7"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="100" r="28" fill="none" stroke="currentColor" stroke-width="6"/>
+  
+  <!-- Snout -->
+  <path d="M 100 115 L 100 135 Q 90 140 80 135" fill="none" stroke="currentColor" stroke-width="6"/>
+  <path d="M 100 115 L 100 135 Q 110 140 120 135" fill="none" stroke="currentColor" stroke-width="6"/>
+  
+  <!-- Left eye -->
+  <circle cx="88" cy="92" r="4" fill="currentColor"/>
+  
+  <!-- Right eye -->
+  <circle cx="112" cy="92" r="4" fill="currentColor"/>
+  
+  <!-- Nose -->
+  <circle cx="100" cy="104" r="3" fill="currentColor"/>
+</svg>

@@ -9,11 +9,11 @@
   --text: #111827;
   --text-secondary: #6b7280;
   --text-tertiary: #9ca3af;
-  --accent: #16a34a;
-  --accent-hover: #15803d;
-  --accent-soft: #dcfce7;
-  --accent-muted: #86efac;
-  --accent-ring: rgba(22, 163, 74, 0.18);
+  --accent: #B8860B;
+  --accent-hover: #9A700A;
+  --accent-soft: #FEF3C7;
+  --accent-muted: #E6B325;
+  --accent-ring: rgba(184, 134, 11, 0.22);
   --danger: #dc2626;
   --danger-soft: #fee2e2;
   --warning: #d97706;
@@ -54,8 +54,8 @@ body {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 15% 10%, rgba(22,163,74,0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(22,163,74,0.05) 0%, transparent 50%);
+    radial-gradient(ellipse at 15% 10%, rgba(184,134,11,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(184,134,11,0.05) 0%, transparent 50%);
 }
 
 /* ─── Shell ──────────────────────────────────────────────────────── */
@@ -118,7 +118,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 .brand-panel {
   border-radius: var(--radius-xl);
   padding: 2.5rem 2rem;
-  background: linear-gradient(150deg, #14532d 0%, #166534 50%, #15803d 100%);
+  background: linear-gradient(150deg, #4A3200 0%, #6B4A00 50%, #7A5500 100%);
   color: #fff;
   position: relative;
   overflow: hidden;
@@ -171,8 +171,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
   object-fit: cover;
   object-position: top center;
   display: block;
-  filter: invert(1);
-  mix-blend-mode: screen;
+  mix-blend-mode: multiply;
 }
 
 .brand-panel h1 {
@@ -195,7 +194,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
   object-fit: cover;
   object-position: top center;
   display: block;
-  filter: invert(0.4) sepia(1) saturate(3) hue-rotate(100deg);
+  mix-blend-mode: multiply;
 }
 
 .brand-tagline {
@@ -305,8 +304,8 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 .seed-box {
   margin-top: 1.75rem;
   padding: 1rem 1.125rem;
-  background: rgba(22,163,74,0.05);
-  border: 1px dashed rgba(22,163,74,0.3);
+  background: rgba(184,134,11,0.05);
+  border: 1px dashed rgba(184,134,11,0.3);
   border-radius: var(--radius-md);
 }
 
@@ -373,7 +372,7 @@ button {
   transition: background var(--transition), box-shadow var(--transition), transform 80ms;
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(22,163,74,0.25), 0 0 0 1px rgba(22,163,74,0.12) inset;
+  box-shadow: 0 1px 3px rgba(184,134,11,0.25), 0 0 0 1px rgba(184,134,11,0.12) inset;
 }
 
 button:hover   { background: var(--accent-hover); box-shadow: var(--shadow-md); }
@@ -438,7 +437,7 @@ button.danger-btn:hover {
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 0.85rem; color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(22,163,74,0.3);
+  box-shadow: 0 2px 8px rgba(184,134,11,0.35);
 }
 
 .topbar-title { font-size: 0.975rem; font-weight: 700; line-height: 1.25; color: var(--text); }
@@ -725,7 +724,7 @@ button.danger-btn:hover {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
-  box-shadow: 0 2px 6px rgba(22,163,74,0.3);
+  box-shadow: 0 2px 6px rgba(184,134,11,0.3);
 }
 
 /* ─── Submission List ────────────────────────────────────────────── */
@@ -841,7 +840,7 @@ th {
 
 td { border-bottom: 1px solid var(--border); }
 tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover { background: rgba(22,163,74,0.025); }
+tbody tr:hover { background: rgba(184,134,11,0.025); }
 
 /* ─── Badges ─────────────────────────────────────────────────────── */
 .badge {
@@ -856,7 +855,7 @@ tbody tr:hover { background: rgba(22,163,74,0.025); }
 
 .badge.warning  { background: var(--warning-soft); color: var(--warning); }
 .badge.critical { background: var(--danger-soft);  color: var(--danger); }
-.badge.ok       { background: var(--accent-soft);  color: #15803d; }
+.badge.ok       { background: var(--accent-soft);  color: #9A700A; }
 
 /* ─── Form Helpers ───────────────────────────────────────────────── */
 .form-intro {

@@ -54,6 +54,8 @@ const el = {
   historyFromDate: document.getElementById("historyFromDate"),
   historyBreadType: document.getElementById("historyBreadType"),
   applyHistoryFilter: document.getElementById("applyHistoryFilter"),
+  changePasswordCard: document.getElementById("changePasswordCard"),
+  changePasswordForm: document.getElementById("changePasswordForm"),
 };
 
 function showToast(message) {
@@ -532,7 +534,7 @@ async function loadStaffList() {
         <div class="staff-avatar">${initials}</div>
         <div class="staff-info">
           <div class="staff-name">${s.name}</div>
-          <div class="staff-detail">${s.email}${s.phone ? " · " + s.phone : ""}</div>
+          <div class="staff-detail">${s.phone || s.email || "—"}</div>
         </div>
         <span class="role-tag ${s.role}">${s.role.charAt(0).toUpperCase() + s.role.slice(1)}</span>
         <button type="button" class="btn-delete-staff danger-btn" data-id="${s.id}">Remove</button>
@@ -568,6 +570,36 @@ function initCreateStaffForm() {
       showToast(`Staff account created for ${body.name}`);
       form.reset();
       loadStaffList();
+    } catch (err) {
+      showToast(err.message);
+    }
+  };
+}
+
+function initChangePasswordForm() {
+  const form = el.changePasswordForm;
+  if (!form) return;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const currentPassword = fd.get("currentPassword");
+    const newPassword = fd.get("newPassword");
+    const confirmPassword = fd.get("confirmPassword");
+    if (newPassword !== confirmPassword) {
+      showToast("New passwords do not match");
+      return;
+    }
+    if (newPassword.length < 4) {
+      showToast("New password must be at least 4 characters");
+      return;
+    }
+    try {
+      await api("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      showToast("Password updated successfully");
+      form.reset();
     } catch (err) {
       showToast(err.message);
     }
@@ -762,13 +794,13 @@ async function boot() {
   el.loginForm.onsubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(el.loginForm);
-    const email = formData.get("email");
+    const phone = formData.get("phone");
     const password = formData.get("password");
 
     try {
       const data = await api("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ phone, password }),
       });
 
       state.token = data.token;
@@ -976,6 +1008,11 @@ async function afterAuth() {
     }
   } else {
     renderFormsByRole();
+    // Show change-password card for staff (not admin)
+    if (state.user.role !== "admin" && el.changePasswordCard) {
+      el.changePasswordCard.classList.remove("hidden");
+      initChangePasswordForm();
+    }
   }
   
   // Setup batch history for both staff and admins

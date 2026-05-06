@@ -37,7 +37,7 @@
 
           <div class="seed-box">
             <h3>Staff Login</h3>
-            <p>Staff accounts are created by the admin. Use your assigned email and password to sign in.</p>
+            <p>Staff accounts are created by the admin. Sign in with your phone number — your default password is the last 4 digits of your number.</p>
           </div>
         </aside>
 
@@ -50,10 +50,10 @@
 
           <!-- Staff login -->
           <div id="staffLoginPane" class="login-pane">
-            <p class="muted" style="margin-bottom:1.25rem">Use your assigned staff email and password.</p>
+            <p class="muted" style="margin-bottom:1.25rem">Enter your phone number and password. Default password is the last 4 digits of your number.</p>
             <form id="loginForm" class="form-grid">
-              <label>Email
-                <input type="email" name="email" required autocomplete="email" placeholder="e.g. jane@bakery.com" />
+              <label>Phone Number
+                <input type="tel" name="phone" required autocomplete="tel" placeholder="e.g. 08012345678" />
               </label>
               <label>Password
                 <input type="password" name="password" required autocomplete="current-password" />
@@ -144,16 +144,32 @@
             </div>
             <div id="batchHistory" class="scroll-table"></div>
           </article>
+
+          <article id="changePasswordCard" class="card hidden" data-nav-label="Change Password">
+            <h3>Change Password</h3>
+            <p class="muted" style="margin-bottom:1.25rem">Update your login password. Your default password is the last 4 digits of your phone number.</p>
+            <form id="changePasswordForm" class="form-grid" style="max-width:360px">
+              <label>Current Password
+                <input type="password" name="currentPassword" required autocomplete="current-password" placeholder="Your current password" />
+              </label>
+              <label>New Password
+                <input type="password" name="newPassword" required autocomplete="new-password" placeholder="Min. 4 characters" />
+              </label>
+              <label>Confirm New Password
+                <input type="password" name="confirmPassword" required autocomplete="new-password" placeholder="Repeat new password" />
+              </label>
+              <button type="submit">Update Password</button>
+            </form>
+          </article>
         </section>
 
         <section id="adminPanel" class="hidden">
           <article id="staffManagementCard" class="card" data-nav-label="Staff">
             <h3>Staff Management</h3>
-            <p class="muted">Create staff accounts. Staff will log in with their email and password.</p>
+            <p class="muted">Create staff accounts. Staff sign in with their phone number — default password is the last 4 digits of their number.</p>
             <form id="createStaffForm" class="form-grid" style="margin-bottom:1.5rem">
               <label>Full Name<input name="name" required placeholder="e.g. Jane Doe" /></label>
-              <label>Email Address<input type="email" name="email" required placeholder="e.g. jane@bakery.com" /></label>
-              <label>Phone Number<input name="phone" placeholder="e.g. 08012345678" /></label>
+              <label>Phone Number<input type="tel" name="phone" required placeholder="e.g. 08012345678" /></label>
               <label>Role
                 <select name="role" required>
                   <option value="">Select role…</option>
@@ -163,7 +179,6 @@
                   <option value="delivery">Delivery</option>
                 </select>
               </label>
-              <label>Password<input type="password" name="password" required placeholder="Min. 6 characters" /></label>
               <button type="submit">Create Staff Account</button>
             </form>
             <h4 style="margin-bottom:0.5rem">Current Staff</h4>

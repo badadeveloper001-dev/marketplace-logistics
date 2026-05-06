@@ -173,15 +173,15 @@ app.post("/api/auth/admin-login", (req, res) => {
 });
 
 app.post("/api/auth/login", (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
+  const phone = String(req.body.phone || "").trim();
   const password = String(req.body.password || "");
-  if (!email || !password) {
-    return badRequest(res, "Email and password are required");
+  if (!phone || !password) {
+    return badRequest(res, "Phone number and password are required");
   }
 
   const user = db
-    .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE lower(email) = ?")
-    .get(email);
+    .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = ?")
+    .get(phone);
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: "Invalid credentials" });
@@ -212,6 +212,27 @@ app.get("/api/auth/me", authRequired, (req, res) => {
   }
 
   res.json({ user });
+});
+
+app.post("/api/auth/change-password", authRequired, (req, res) => {
+  const currentPassword = String(req.body.currentPassword || "");
+  const newPassword = String(req.body.newPassword || "");
+  if (!currentPassword || !newPassword) {
+    return badRequest(res, "Current and new password are required");
+  }
+  if (newPassword.length < 4) {
+    return badRequest(res, "New password must be at least 4 characters");
+  }
+  const staffUser = db
+    .prepare("SELECT id, password_hash FROM users WHERE id = ?")
+    .get(req.user.id);
+  if (!staffUser || !bcrypt.compareSync(currentPassword, staffUser.password_hash)) {
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+  const newHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, req.user.id);
+  queueSupabaseSync();
+  res.json({ ok: true });
 });
 
 app.get("/api/meta", authRequired, (req, res) => {
@@ -550,13 +571,12 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), (req, res) => 
 
 app.post("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => {
   const name = String(req.body.name || "").trim();
-  const email = String(req.body.email || "").trim().toLowerCase();
   const phone = String(req.body.phone || "").trim();
   const role = String(req.body.role || "").trim();
-  const password = String(req.body.password || "");
+  const email = String(req.body.email || "").trim().toLowerCase();
 
-  if (!name || !email || !role || !password) {
-    return badRequest(res, "Name, email, role and password are required");
+  if (!name || !phone || !role) {
+    return badRequest(res, "Name, phone number, and role are required");
   }
 
   const validRoles = ["baker", "bagger", "sales", "delivery"];
@@ -564,26 +584,36 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => 
     return badRequest(res, "Role must be one of: baker, bagger, sales, delivery");
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return badRequest(res, "Invalid email address");
+  if (!/^\d{7,15}$/.test(phone.replace(/[\s\-\+\(\)]/g, ""))) {
+    return badRequest(res, "Invalid phone number");
   }
 
-  if (password.length < 6) {
-    return badRequest(res, "Password must be at least 6 characters");
+  const normalizedPhone = phone.replace(/[\s\-\+\(\)]/g, "").replace(/^234/, "0");
+
+  const existingPhone = db.prepare("SELECT id FROM users WHERE phone = ?").get(normalizedPhone);
+  if (existingPhone) {
+    return res.status(409).json({ error: "A user with that phone number already exists" });
   }
 
-  const existing = db.prepare("SELECT id FROM users WHERE lower(email) = ?").get(email);
-  if (existing) {
-    return res.status(409).json({ error: "A user with that email already exists" });
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return badRequest(res, "Invalid email address");
+    }
+    const existingEmail = db.prepare("SELECT id FROM users WHERE lower(email) = ?").get(email);
+    if (existingEmail) {
+      return res.status(409).json({ error: "A user with that email already exists" });
+    }
   }
 
-  const username = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "_");
-  const passwordHash = bcrypt.hashSync(password, 10);
+  // Default password = last 4 digits of the normalized phone number
+  const last4 = normalizedPhone.slice(-4);
+  const passwordHash = bcrypt.hashSync(last4, 10);
+  const username = `staff_${normalizedPhone.slice(-6)}`;
 
   const info = db
     .prepare("INSERT INTO users (name, email, phone, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(name, email, phone || null, username, passwordHash, role);
+    .run(name, email || null, normalizedPhone, username, passwordHash, role);
 
   const created = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?")

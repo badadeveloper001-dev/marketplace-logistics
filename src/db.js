@@ -215,6 +215,36 @@ async function ensurePostgresSchema() {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
   `);
+
+  // Backfill/migrate existing databases created from older schema versions.
+  await pgPool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS severity TEXT;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
+
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS severity TEXT;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
+
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS severity TEXT;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
+
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS severity TEXT;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
+
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'warning';
+
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS old_value TEXT;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS new_value TEXT;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+  `);
 }
 
 function getSqliteTableColumns(tableName) {

@@ -1216,4 +1216,10 @@ if (!IS_VERCEL) {
   });
 }
 
+  app.use((err, _req, res, _next) => {
+    console.error("Unhandled API error:", err);
+    const message = err && err.message ? err.message : "Internal server error";
+    res.status(500).json({ error: "Internal Server Error", message });
+  });
+
 module.exports = app;

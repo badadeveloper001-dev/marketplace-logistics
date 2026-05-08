@@ -375,7 +375,7 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
   } catch (error) {
     console.error("Sync failed during production submission:", error.message);
     if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
     }
   }
 
@@ -445,7 +445,7 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), async (req, res) 
   } catch (error) {
     console.error("Sync failed during bagging submission:", error.message);
     if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
     }
   }
 
@@ -538,7 +538,7 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
   } catch (error) {
     console.error("Sync failed during sales submission:", error.message);
     if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
     }
   }
 
@@ -611,7 +611,7 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), async (req, re
   } catch (error) {
     console.error("Sync failed during delivery submission:", error.message);
     if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
     }
   }
 

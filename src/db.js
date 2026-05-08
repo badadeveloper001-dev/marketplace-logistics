@@ -38,7 +38,7 @@ function resolveDbPath() {
 
 const DB_PATH = resolveDbPath();
 const POSTGRES_URL =
-  process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || buildSupabaseDbUrl() || "";
+  process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || buildSupabaseDbUrl() || "";
 const USE_POSTGRES = Boolean(POSTGRES_URL);
 const IS_VERCEL = Boolean(process.env.VERCEL);
 

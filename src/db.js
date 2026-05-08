@@ -221,24 +221,87 @@ async function ensurePostgresSchema() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS bread_type TEXT;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS flour_bags DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS expected_output DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS produced_count INTEGER;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS sugar DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS salt DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS preservative DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS butter DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS yeast DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS vegetable_oil DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS improver DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS difference DOUBLE PRECISION;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS flagged INTEGER;
+    ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
 
     ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS severity TEXT;
     ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
     ALTER TABLE production_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
 
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS bread_type TEXT;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS received_count INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS bagged_count INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS difference INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS flagged INTEGER;
+    ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+
     ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS severity TEXT;
     ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
     ALTER TABLE bagging_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
+
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS bread_type TEXT;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS received_for_sales INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS paid_count INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS credit_count INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS total_sold INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS difference INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS flagged INTEGER;
+    ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
 
     ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS severity TEXT;
     ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
     ALTER TABLE sales_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
 
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS bread_type TEXT;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS taken_count INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS paid_count INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS credit_count INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS total_delivered INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS difference INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS flagged INTEGER;
+    ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+
     ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS severity TEXT;
     ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS adjusted_by INTEGER;
     ALTER TABLE delivery_logs ADD COLUMN IF NOT EXISTS adjusted_at TIMESTAMP;
 
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS stage TEXT;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS ref_table TEXT;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS ref_id INTEGER;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS bread_type TEXT;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS difference DOUBLE PRECISION;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
+
     ALTER TABLE discrepancies ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'warning';
+
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS admin_user_id INTEGER;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS table_name TEXT;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS entry_id INTEGER;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS field_name TEXT;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS reason TEXT;
+    ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;
 
     ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS old_value TEXT;
     ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS new_value TEXT;
@@ -256,7 +319,7 @@ function getSqliteTableColumns(tableName) {
 
 function toSqliteBindable(value) {
   if (value instanceof Date) {
-    return value.toISOString();
+    return value.toISOString().slice(0, 19).replace("T", " ");
   }
   return value;
 }

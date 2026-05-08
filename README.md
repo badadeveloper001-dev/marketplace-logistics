@@ -25,7 +25,7 @@ No manual staff name entry is used anywhere.
 - Staff submission history (read-only for staff)
 - Financial loss calculation from missing loaves by bread type pricing
 - Critical discrepancy email notifications (SMTP)
-- Optional Supabase PostgreSQL persistence sync for production durability
+- Supabase PostgreSQL persistence sync for production durability
 - Mobile-first, fast input dashboard UI
 
 ## Bread Types And Prices
@@ -215,6 +215,42 @@ Admin:
 - SMTP_USER: SMTP username
 - SMTP_PASS: SMTP password or app password
 - SMTP_FROM: optional from address (defaults to SMTP_USER)
-- DATABASE_URL or SUPABASE_DB_URL: optional Supabase PostgreSQL connection string for persistent sync
+- SQLITE_DB_PATH: optional absolute path to SQLite file (recommended for local development only)
+- DATABASE_URL or SUPABASE_DB_URL: Supabase PostgreSQL connection string used for durable persistence
+- SUPABASE_URL + SUPABASE_DB_PASSWORD: optional pair used to auto-build SUPABASE_DB_URL at startup
+
+On Vercel, DATABASE_URL/SUPABASE_DB_URL is required. The server now fails fast at startup if it is missing so writes never appear successful while being non-durable.
+
+Important: SUPABASE_URL, anon key, service-role key, and JWT secret are API credentials. They are not PostgreSQL login credentials by themselves. The backend in this project writes through PostgreSQL (pg), so you must provide a PostgreSQL connection string or a database password (SUPABASE_DB_PASSWORD) so the app can build one.
 
 If DATABASE_URL/SUPABASE_DB_URL is set, the app initializes SQLite locally and synchronizes all operational tables to Supabase so data survives serverless restarts.
+
+## Move To Real Database (Supabase)
+
+1. Create a Supabase project.
+2. Copy the pooled PostgreSQL connection string.
+3. In Vercel project settings, add one of these environment variables:
+	- SUPABASE_DB_URL
+	- DATABASE_URL
+4. Set JWT_SECRET and ADMIN_ACCESS_CODE in Vercel as well.
+5. Redeploy.
+
+For local setup, copy .env.example values into your local environment and run npm start.
+
+### Verify Persistence Is Active
+
+Run locally:
+
+npm run check:persistence
+
+Expected for durable mode:
+
+- PostgreSQL configured: yes
+- PostgreSQL connected: yes
+- Durable mode: enabled
+
+You can also verify from the running app:
+
+- GET /api/health/persistence
+
+On Vercel, this endpoint returns HTTP 503 when durable PostgreSQL persistence is not active.

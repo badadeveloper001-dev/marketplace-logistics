@@ -7,6 +7,8 @@ const {
   db,
   initDb,
   queueSupabaseSync,
+  ensureSyncComplete,
+  checkPostgresConnection,
   BREAD_TYPES,
   THRESHOLD,
   getSeverity,
@@ -249,6 +251,25 @@ app.get("/api/meta", authRequired, (req, res) => {
       "vegetable_oil",
       "improver",
     ],
+  });
+});
+
+app.get("/api/health/persistence", async (_req, res) => {
+  const postgres = await checkPostgresConnection();
+  const durable = postgres.configured && postgres.connected;
+  const statusCode = durable || !IS_VERCEL ? 200 : 503;
+
+  res.status(statusCode).json({
+    ok: durable || !IS_VERCEL,
+    runtime: {
+      vercel: IS_VERCEL,
+    },
+    persistence: {
+      durable,
+      postgres,
+      sqliteFallback: !postgres.configured,
+    },
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -569,7 +590,7 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), (req, res) => 
   });
 });
 
-app.post("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => {
+app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, res) => {
   const name = String(req.body.name || "").trim();
   const phone = String(req.body.phone || "").trim();
   const role = String(req.body.role || "").trim();
@@ -618,7 +639,19 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => 
   const created = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?")
     .get(info.lastInsertRowid);
+  
   queueSupabaseSync();
+  
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during staff creation:", error.message);
+    // On Vercel, if sync to PostgreSQL fails, data will be lost when instance restarts
+    // So we must throw an error instead of silently failing
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist staff data. Please try again." });
+    }
+  }
 
   res.status(201).json({ user: created });
 });
@@ -630,7 +663,7 @@ app.get("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => {
   res.json({ staff });
 });
 
-app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), (req, res) => {
+app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return badRequest(res, "Invalid staff ID");
@@ -640,6 +673,18 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), (req, re
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
   db.prepare("DELETE FROM users WHERE id = ?").run(id);
   queueSupabaseSync();
+  
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during staff deletion:", error.message);
+    // On Vercel, if sync to PostgreSQL fails, data will be lost when instance restarts
+    // So we must throw an error instead of silently failing
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist deletion. Please try again." });
+    }
+  }
+  
   res.json({ deleted: id });
 });
 

@@ -1,11 +1,52 @@
 const path = require("path");
+const fs = require("fs");
+const dns = require("dns");
 const Database = require("better-sqlite3");
 const bcrypt = require("bcryptjs");
 const { Pool } = require("pg");
 
-const DB_PATH = process.env.VERCEL ? "/tmp/bakery.db" : path.join(__dirname, "..", "bakery.db");
-const POSTGRES_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || "";
+dns.setDefaultResultOrder("ipv4first");
+
+function buildSupabaseDbUrl() {
+  const supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
+  const dbPassword = String(process.env.SUPABASE_DB_PASSWORD || "").trim();
+  if (!supabaseUrl || !dbPassword) return "";
+
+  try {
+    const parsed = new URL(supabaseUrl);
+    const [projectRef] = parsed.hostname.split(".");
+    if (!projectRef) return "";
+    return `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres?sslmode=require`;
+  } catch (_error) {
+    return "";
+  }
+}
+
+function resolveDbPath() {
+  if (process.env.SQLITE_DB_PATH) {
+    return process.env.SQLITE_DB_PATH;
+  }
+
+  const persistentPath = path.join(__dirname, "..", "bakery.db");
+  try {
+    fs.accessSync(path.dirname(persistentPath), fs.constants.W_OK);
+    return persistentPath;
+  } catch (_error) {
+    return "/tmp/bakery.db";
+  }
+}
+
+const DB_PATH = resolveDbPath();
+const POSTGRES_URL =
+  process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || buildSupabaseDbUrl() || "";
 const USE_POSTGRES = Boolean(POSTGRES_URL);
+const IS_VERCEL = Boolean(process.env.VERCEL);
+
+if (IS_VERCEL && !USE_POSTGRES) {
+  throw new Error(
+    "PostgreSQL is required on Vercel. Set SUPABASE_DB_URL or DATABASE_URL to enable durable storage."
+  );
+}
 
 const BREAD_TYPES = {
   Jumbo: { price: 2000, fromFlourBag: 65 },
@@ -34,6 +75,11 @@ const pgPool = USE_POSTGRES
   ? new Pool({
       connectionString: POSTGRES_URL,
       ssl: { rejectUnauthorized: false },
+      family: Number(process.env.PG_FAMILY || 4),
+      connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 8000),
+      idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 10000),
+      max: Number(process.env.PG_POOL_MAX || 10),
+      statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT_MS || 10000),
     })
   : null;
 
@@ -275,6 +321,7 @@ function queueSupabaseSync() {
   syncInFlight = syncAllToPostgres()
     .catch((error) => {
       console.error("Supabase sync failed:", error.message);
+      throw error;
     })
     .finally(() => {
       syncInFlight = null;
@@ -283,6 +330,53 @@ function queueSupabaseSync() {
         queueSupabaseSync();
       }
     });
+}
+
+async function ensureSyncComplete() {
+  if (!pgPool) {
+    // Local/dev mode can run on SQLite without PostgreSQL.
+    return;
+  }
+  
+  // If sync is already in flight, wait for it
+  if (syncInFlight) {
+    await syncInFlight;
+    return;
+  }
+  
+  // If there's a queued sync, trigger it and wait
+  if (syncQueued) {
+    syncQueued = false;
+    queueSupabaseSync();
+    if (syncInFlight) {
+      await syncInFlight;
+    }
+  }
+}
+
+async function checkPostgresConnection() {
+  if (!pgPool) {
+    return {
+      configured: false,
+      connected: false,
+      error: "SUPABASE_DB_URL or DATABASE_URL is not set",
+    };
+  }
+
+  try {
+    await pgPool.query("SELECT 1");
+    return {
+      configured: true,
+      connected: true,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      connected: false,
+      error: error.message,
+    };
+  }
 }
 
 function hasColumn(tableName, columnName) {
@@ -575,6 +669,8 @@ module.exports = {
   initDb,
   USE_POSTGRES,
   queueSupabaseSync,
+  ensureSyncComplete,
+  checkPostgresConnection,
   BREAD_TYPES,
   INGREDIENTS,
   THRESHOLD,

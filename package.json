@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "dev": "node src/server.js",
+    "check:persistence": "node scripts/check-persistence.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

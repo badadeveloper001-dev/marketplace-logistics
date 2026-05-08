@@ -9,11 +9,11 @@
   --text: #111827;
   --text-secondary: #6b7280;
   --text-tertiary: #9ca3af;
-  --accent: #B8860B;
-  --accent-hover: #9A700A;
-  --accent-soft: #FEF3C7;
-  --accent-muted: #E6B325;
-  --accent-ring: rgba(184, 134, 11, 0.22);
+  --accent: #CFAE00;
+  --accent-hover: #B49300;
+  --accent-soft: #FFFDE6;
+  --accent-muted: #B49300;
+  --accent-ring: rgba(207, 174, 0, 0.35);
   --danger: #dc2626;
   --danger-soft: #fee2e2;
   --warning: #d97706;
@@ -118,11 +118,11 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 .brand-panel {
   border-radius: var(--radius-xl);
   padding: 2.5rem 2rem;
-  background: linear-gradient(150deg, #4A3200 0%, #6B4A00 50%, #7A5500 100%);
-  color: #fff;
+  background: linear-gradient(150deg, #EED873 0%, #CFAE00 52%, #9E8100 100%);
+  color: #1f2937;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(255,255,255,0.06) inset;
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.08) inset;
 }
 
 .brand-panel::before {
@@ -131,7 +131,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
   top: -80px; right: -80px;
   width: 280px; height: 280px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.28);
   pointer-events: none;
 }
 
@@ -141,13 +141,13 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
   bottom: -60px; left: -60px;
   width: 220px; height: 220px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.2);
   pointer-events: none;
 }
 
-.brand-panel .eyebrow { color: rgba(255,255,255,0.65); }
-.brand-panel h1 { color: #fff; margin-bottom: 0.75rem; }
-.brand-panel p  { color: rgba(255,255,255,0.78); font-size: 0.95rem; }
+.brand-panel .eyebrow { color: rgba(17,24,39,0.72); }
+.brand-panel h1 { color: #111827; margin-bottom: 0.75rem; }
+.brand-panel p  { color: rgba(17,24,39,0.8); font-size: 0.95rem; }
 
 .brand-header {
   display: flex;
@@ -175,7 +175,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 }
 
 .brand-panel h1 {
-  color: #fff;
+  color: #111827;
   margin: 0;
   flex: 1;
 }
@@ -198,7 +198,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 }
 
 .brand-tagline {
-  color: rgba(255,255,255,0.78) !important;
+  color: rgba(17,24,39,0.82) !important;
   font-size: 0.95rem !important;
   margin-bottom: 0 !important;
 }
@@ -211,13 +211,13 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
 }
 
 .feature-pills span {
-  background: rgba(255,255,255,0.13);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(17,24,39,0.08);
+  border: 1px solid rgba(17,24,39,0.2);
   border-radius: var(--radius-full);
   padding: 0.32rem 0.75rem;
   font-size: 0.79rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.9);
+  color: rgba(17,24,39,0.9);
 }
 
 .auth-panel {

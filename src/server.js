@@ -21,7 +21,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_VERCEL = Boolean(process.env.VERCEL);
 const JWT_SECRET = process.env.JWT_SECRET || "bakery_control_secret_change_me";
-const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || "BIGCAT-ADMIN-2026";
+const ADMIN_ACCESS_CODE = process.env.ADMIN_ACCESS_CODE || "BIGCAT00";
 const ALERT_EMAIL_TO = process.env.ALERT_EMAIL_TO || "";
 
 const smtpPort = Number(process.env.SMTP_PORT || 587);

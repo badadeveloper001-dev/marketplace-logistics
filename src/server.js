@@ -273,7 +273,7 @@ app.get("/api/health/persistence", async (_req, res) => {
   });
 });
 
-app.post("/api/production", authRequired, roleRequired("baker"), (req, res) => {
+app.post("/api/production", authRequired, roleRequired("baker"), async (req, res) => {
   const {
     breadType,
     flourBags,
@@ -370,6 +370,15 @@ app.post("/api/production", authRequired, roleRequired("baker"), (req, res) => {
   });
   queueSupabaseSync();
 
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during production submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+    }
+  }
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -382,7 +391,7 @@ app.post("/api/production", authRequired, roleRequired("baker"), (req, res) => {
   });
 });
 
-app.post("/api/bagging", authRequired, roleRequired("bagger"), (req, res) => {
+app.post("/api/bagging", authRequired, roleRequired("bagger"), async (req, res) => {
   const { breadType, receivedCount, baggedCount } = req.body;
 
   if (!validateBreadType(breadType)) {
@@ -431,6 +440,15 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), (req, res) => {
   });
   queueSupabaseSync();
 
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during bagging submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+    }
+  }
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -441,7 +459,7 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), (req, res) => {
   });
 });
 
-app.post("/api/sales", authRequired, roleRequired("sales"), (req, res) => {
+app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => {
   const { breadType, paidCount, creditCount } = req.body;
 
   if (!validateBreadType(breadType)) {
@@ -515,6 +533,15 @@ app.post("/api/sales", authRequired, roleRequired("sales"), (req, res) => {
   });
   queueSupabaseSync();
 
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during sales submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+    }
+  }
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -527,7 +554,7 @@ app.post("/api/sales", authRequired, roleRequired("sales"), (req, res) => {
   });
 });
 
-app.post("/api/delivery", authRequired, roleRequired("delivery"), (req, res) => {
+app.post("/api/delivery", authRequired, roleRequired("delivery"), async (req, res) => {
   const { breadType, takenCount, paidCount, creditCount } = req.body;
 
   if (!validateBreadType(breadType)) {
@@ -578,6 +605,15 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), (req, res) => 
     createdAt,
   });
   queueSupabaseSync();
+
+  try {
+    await ensureSyncComplete();
+  } catch (error) {
+    console.error("Sync failed during delivery submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission. Please try again." });
+    }
+  }
 
   res.status(201).json({
     id: info.lastInsertRowid,

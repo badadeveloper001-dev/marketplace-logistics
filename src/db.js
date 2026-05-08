@@ -254,6 +254,13 @@ function getSqliteTableColumns(tableName) {
     .map((column) => column.name);
 }
 
+function toSqliteBindable(value) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return value;
+}
+
 async function copySqliteTableToPostgres(tableName, client) {
   const columns = getSqliteTableColumns(tableName);
   if (!columns.length) return;
@@ -283,7 +290,7 @@ async function copyPostgresTableToSqlite(tableName, client) {
   const stmt = db.prepare(sql);
   const tx = db.transaction((rows) => {
     rows.forEach((row) => {
-      stmt.run(...columns.map((name) => row[name]));
+      stmt.run(...columns.map((name) => toSqliteBindable(row[name])));
     });
   });
   tx(pgResult.rows);

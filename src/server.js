@@ -9,6 +9,7 @@ const {
   queueSupabaseSync,
   ensureSyncComplete,
   checkPostgresConnection,
+  deleteUserAndRelatedRecords,
   BREAD_TYPES,
   THRESHOLD,
   getSeverity,
@@ -707,7 +708,7 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
   const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id);
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
-  db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  deleteUserAndRelatedRecords(id);
   queueSupabaseSync();
   
   try {

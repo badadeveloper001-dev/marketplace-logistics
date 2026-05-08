@@ -553,6 +553,36 @@ function removeLegacySeedStaff() {
   cleanup(legacyUsers);
 }
 
+function deleteUserAndRelatedRecords(userId) {
+  const deleteProductionLogs = db.prepare("DELETE FROM production_logs WHERE user_id = ?");
+  const deleteBaggingLogs = db.prepare("DELETE FROM bagging_logs WHERE user_id = ?");
+  const deleteSalesLogs = db.prepare("DELETE FROM sales_logs WHERE user_id = ?");
+  const deleteDeliveryLogs = db.prepare("DELETE FROM delivery_logs WHERE user_id = ?");
+  const deleteDiscrepancies = db.prepare("DELETE FROM discrepancies WHERE user_id = ?");
+  const clearProductionAdjustedBy = db.prepare("UPDATE production_logs SET adjusted_by = NULL, adjusted_at = NULL WHERE adjusted_by = ?");
+  const clearBaggingAdjustedBy = db.prepare("UPDATE bagging_logs SET adjusted_by = NULL, adjusted_at = NULL WHERE adjusted_by = ?");
+  const clearSalesAdjustedBy = db.prepare("UPDATE sales_logs SET adjusted_by = NULL, adjusted_at = NULL WHERE adjusted_by = ?");
+  const clearDeliveryAdjustedBy = db.prepare("UPDATE delivery_logs SET adjusted_by = NULL, adjusted_at = NULL WHERE adjusted_by = ?");
+  const deleteAdjustments = db.prepare("DELETE FROM adjustments WHERE admin_user_id = ?");
+  const deleteUser = db.prepare("DELETE FROM users WHERE id = ?");
+
+  const cleanup = db.transaction((id) => {
+    deleteDiscrepancies.run(id);
+    clearProductionAdjustedBy.run(id);
+    clearBaggingAdjustedBy.run(id);
+    clearSalesAdjustedBy.run(id);
+    clearDeliveryAdjustedBy.run(id);
+    deleteProductionLogs.run(id);
+    deleteBaggingLogs.run(id);
+    deleteSalesLogs.run(id);
+    deleteDeliveryLogs.run(id);
+    deleteAdjustments.run(id);
+    deleteUser.run(id);
+  });
+
+  cleanup(userId);
+}
+
 async function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -779,6 +809,7 @@ module.exports = {
   queueSupabaseSync,
   ensureSyncComplete,
   checkPostgresConnection,
+  deleteUserAndRelatedRecords,
   BREAD_TYPES,
   INGREDIENTS,
   THRESHOLD,

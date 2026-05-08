@@ -281,7 +281,15 @@ async function copyPostgresTableToSqlite(tableName, client) {
   const columns = getSqliteTableColumns(tableName);
   if (!columns.length) return;
 
-  const pgResult = await client.query(`SELECT ${columns.join(", ")} FROM ${tableName} ORDER BY id ASC`);
+  const pgColumnsResult = await client.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+    [tableName]
+  );
+  const pgColumns = new Set(pgColumnsResult.rows.map((row) => row.column_name));
+  const availableColumns = columns.filter((name) => pgColumns.has(name));
+  if (!availableColumns.length) return;
+
+  const pgResult = await client.query(`SELECT ${availableColumns.join(", ")} FROM ${tableName} ORDER BY id ASC`);
   db.prepare(`DELETE FROM ${tableName}`).run();
   if (!pgResult.rows.length) return;
 
@@ -290,7 +298,7 @@ async function copyPostgresTableToSqlite(tableName, client) {
   const stmt = db.prepare(sql);
   const tx = db.transaction((rows) => {
     rows.forEach((row) => {
-      stmt.run(...columns.map((name) => toSqliteBindable(row[name])));
+      stmt.run(...columns.map((name) => toSqliteBindable(pgColumns.has(name) ? row[name] : null)));
     });
   });
   tx(pgResult.rows);

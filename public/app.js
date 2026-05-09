@@ -56,6 +56,10 @@ const el = {
   applyHistoryFilter: document.getElementById("applyHistoryFilter"),
   changePasswordCard: document.getElementById("changePasswordCard"),
   changePasswordForm: document.getElementById("changePasswordForm"),
+  blameAnalysisCard: document.getElementById("blameAnalysisCard"),
+  blameAnalysisDate: document.getElementById("blameAnalysisDate"),
+  loadBlameAnalysisBtn: document.getElementById("loadBlameAnalysisBtn"),
+  blameAnalysisResults: document.getElementById("blameAnalysisResults"),
 };
 
 function showToast(message) {
@@ -146,6 +150,7 @@ function renderFormsByRole() {
     el.salesForm.innerHTML = `
       <p class="form-intro">Submit one batch at a time.</p>
       <label>Bread Type<select name="breadType" required>${options}</select></label>
+      <label>Bread Received<input name="receivedCount" type="number" min="0" step="1" required /></label>
       <label>Sold Paid<input name="paidCount" type="number" min="0" step="1" required /></label>
       <label>Sold Credit<input name="creditCount" type="number" min="0" step="1" required /></label>
       <button type="submit">Submit Sales</button>
@@ -208,6 +213,7 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     target = document.getElementById("bakerPreview");
     fields = [
       previewField("Bread Type", submittedBody.breadType),
+      previewField("Received", submittedBody.receivedCount),
       previewField("Flour Bags", submittedBody.flourBags),
       previewField("Produced", submittedBody.producedCount),
       previewField("Sugar", submittedBody.sugar),
@@ -225,6 +231,7 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     fields = [
       previewField("Bread Type", submittedBody.breadType),
       previewField("Received", submittedBody.receivedCount),
+      previewField("Received", submittedBody.receivedCount),
       previewField("Bagged", submittedBody.baggedCount),
     ].join("");
   }
@@ -233,6 +240,7 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     target = document.getElementById("salesPreview");
     fields = [
       previewField("Bread Type", submittedBody.breadType),
+      previewField("Received", submittedBody.receivedCount),
       previewField("Paid", submittedBody.paidCount),
       previewField("Credit", submittedBody.creditCount),
       previewField("Total Sold", savedResult.totalSold),
@@ -243,6 +251,7 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     target = document.getElementById("deliveryPreview");
     fields = [
       previewField("Bread Type", submittedBody.breadType),
+      previewField("Received", submittedBody.receivedCount),
       previewField("Taken", submittedBody.takenCount),
       previewField("Paid", submittedBody.paidCount),
       previewField("Credit", submittedBody.creditCount),
@@ -777,6 +786,54 @@ async function refreshAdmin() {
   buildQuickNav();
 }
 
+async function loadBlameAnalysis() {
+  const date = el.blameAnalysisDate.value || new Date().toISOString().slice(0, 10);
+  try {
+    const result = await api(`/api/admin/blame-analysis?date=${date}`);
+    const { analysis } = result;
+
+    if (!analysis || analysis.length === 0) {
+      el.blameAnalysisResults.innerHTML = '<p class="muted">No data for this date.</p>';
+      return;
+    }
+
+    let html = '<div style="display: grid; gap: 1.5rem;">';
+    analysis.forEach((item) => {
+      const totalLoss = item.totalLoss || 0;
+      const status = totalLoss === 0 ? 'ok' : totalLoss > 5 ? 'critical' : 'warning';
+      
+      let blameHtml = '';
+      if (item.blame && Array.isArray(item.blame)) {
+        blameHtml = item.blame.map(b => `
+          <div style="padding: 0.75rem; background: #f0f0f0; border-left: 3px solid #ff6b6b; margin: 0.5rem 0;">
+            <strong>${b.stage}</strong> - Lost: <strong>${b.loss}</strong> loaves<br/>
+            <small style="color: #666;">${b.reason}</small>
+          </div>
+        `).join('');
+      }
+
+      html += `
+        <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; background: #fafafa;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <strong>${item.breadType}</strong>
+            <span class="badge ${status}">${totalLoss === 0 ? 'OK' : totalLoss > 0 ? 'LOSS: ' + totalLoss : ''}</span>
+          </div>
+          <div style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.9rem; margin-bottom: 0.75rem;">
+            Baker: ${item.produced} → Bagger: ${item.bagged} → Sales: ${item.sold} → Delivery: ${item.delivered}
+          </div>
+          ${blameHtml || '<p class="muted" style="margin: 0;">No discrepancies</p>'}
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    el.blameAnalysisResults.innerHTML = html;
+  } catch (err) {
+    el.blameAnalysisResults.innerHTML = `<p class="muted">Error: ${err.message}</p>`;
+  }
+}
+
+
 async function boot() {
   el.reportDate.value = new Date().toISOString().slice(0, 10);
 
@@ -1006,6 +1063,9 @@ async function afterAuth() {
     } catch (error) {
       showToast(error.message || "Unable to load admin submissions");
     }
+    // Setup blame analysis card
+    el.blameAnalysisDate.value = new Date().toISOString().slice(0, 10);
+    el.loadBlameAnalysisBtn.onclick = () => loadBlameAnalysis();
   } else {
     renderFormsByRole();
     // Show change-password card for staff (not admin)

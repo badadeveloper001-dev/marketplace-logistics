@@ -492,35 +492,22 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), async (req, res) 
 });
 
 app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => {
-  const { breadType, paidCount, creditCount } = req.body;
+  const { breadType, receivedCount, paidCount, creditCount } = req.body;
 
   if (!validateBreadType(breadType)) {
     return badRequest(res, "Invalid bread type");
   }
 
+  const received = asNumber(receivedCount);
   const paid = asNumber(paidCount);
   const credit = asNumber(creditCount);
 
-  if ([paid, credit].some((n) => Number.isNaN(n) || n < 0)) {
+  if ([received, paid, credit].some((n) => Number.isNaN(n) || n < 0)) {
     return badRequest(res, "Counts must be non-negative numbers");
   }
 
   const totalSold = paid + credit;
-
-  const baggedTotal = db
-    .prepare(
-      `SELECT COALESCE(SUM(bagged_count), 0) AS total FROM bagging_logs WHERE bread_type = ? AND date(created_at) = date('now')`
-    )
-    .get(breadType).total;
-
-  const soldBefore = db
-    .prepare(
-      `SELECT COALESCE(SUM(total_sold), 0) AS total FROM sales_logs WHERE bread_type = ? AND date(created_at) = date('now')`
-    )
-    .get(breadType).total;
-
-  const receivedForSales = Number(baggedTotal) - Number(soldBefore);
-  const difference = receivedForSales - totalSold;
+  const difference = received - totalSold;
   const severity = getSeverity(Math.abs(difference));
   const flagged = severity ? 1 : 0;
 
@@ -533,7 +520,7 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
     .run(
       req.user.id,
       breadType,
-      receivedForSales,
+      received,
       paid,
       credit,
       totalSold,
@@ -558,7 +545,7 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
     const pgRow = await pgDirectInsert("sales_logs", {
       user_id: req.user.id,
       bread_type: breadType,
-      received_for_sales: receivedForSales,
+      received_for_sales: received,
       paid_count: paid,
       credit_count: credit,
       total_sold: totalSold,
@@ -588,7 +575,7 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
     id: info.lastInsertRowid,
     breadType,
     totalSold,
-    inferredReceivedForSales: receivedForSales,
+    inferredReceivedForSales: received,
     difference,
     flagged: Boolean(flagged),
     severity,
@@ -1237,6 +1224,121 @@ app.get("/api/admin/adjustments", authRequired, roleRequired("admin"), (req, res
   res.json({ rows });
 });
 
+app.get("/api/admin/blame-analysis", authRequired, roleRequired("admin"), (req, res) => {
+  const { date: dateStr, breadType: filterBreadType } = req.query;
+  const { start, end } = toDateBounds(dateStr);
+
+  // Collect all submissions from each stage for the period
+  const prodRows = db
+    .prepare(
+      `SELECT bread_type, SUM(produced_count) as total FROM production_logs
+       WHERE created_at BETWEEN ? AND ? ${filterBreadType ? "AND bread_type = ?" : ""}
+       GROUP BY bread_type`
+    )
+    .all(...(filterBreadType ? [start, end, filterBreadType] : [start, end]));
+
+  const bagRows = db
+    .prepare(
+      `SELECT bread_type, SUM(received_count) as received, SUM(bagged_count) as total FROM bagging_logs
+       WHERE created_at BETWEEN ? AND ? ${filterBreadType ? "AND bread_type = ?" : ""}
+       GROUP BY bread_type`
+    )
+    .all(...(filterBreadType ? [start, end, filterBreadType] : [start, end]));
+
+  const saleRows = db
+    .prepare(
+      `SELECT bread_type, SUM(received_for_sales) as received, SUM(total_sold) as total FROM sales_logs
+       WHERE created_at BETWEEN ? AND ? ${filterBreadType ? "AND bread_type = ?" : ""}
+       GROUP BY bread_type`
+    )
+    .all(...(filterBreadType ? [start, end, filterBreadType] : [start, end]));
+
+  const delRows = db
+    .prepare(
+      `SELECT bread_type, SUM(taken_count) as received, SUM(total_delivered) as total FROM delivery_logs
+       WHERE created_at BETWEEN ? AND ? ${filterBreadType ? "AND bread_type = ?" : ""}
+       GROUP BY bread_type`
+    )
+    .all(...(filterBreadType ? [start, end, filterBreadType] : [start, end]));
+
+  // Perform root-cause analysis
+  const analysis = [];
+
+  const allBreadTypes = new Set();
+  [...prodRows, ...bagRows, ...saleRows, ...delRows].forEach((r) => allBreadTypes.add(r.bread_type));
+
+  allBreadTypes.forEach((breadType) => {
+    const prod = prodRows.find((r) => r.bread_type === breadType);
+    const bag = bagRows.find((r) => r.bread_type === breadType);
+    const sale = saleRows.find((r) => r.bread_type === breadType);
+    const del = delRows.find((r) => r.bread_type === breadType);
+
+    const produced = prod?.total ?? 0;
+    const bakerLoss = produced - (bag?.received ?? 0);
+    const baggerLoss = (bag?.received ?? 0) - (bag?.total ?? 0);
+    const baggerToSalesLoss = (bag?.total ?? 0) - (sale?.received ?? 0);
+    const salesLoss = (sale?.received ?? 0) - (sale?.total ?? 0);
+    const salesToDeliveryLoss = (sale?.total ?? 0) - (del?.received ?? 0);
+    const deliveryLoss = (del?.received ?? 0) - (del?.total ?? 0);
+
+    const blame = [];
+    if (bakerLoss > 0) {
+      blame.push({
+        stage: "Baker",
+        loss: bakerLoss,
+        reason: `Baker produced ${produced} but bagger only received ${bag?.received ?? 0}`,
+      });
+    }
+    if (baggerLoss > 0) {
+      blame.push({
+        stage: "Bagger",
+        loss: baggerLoss,
+        reason: `Bagger received ${bag?.received ?? 0} but bagged ${bag?.total ?? 0}`,
+      });
+    }
+    if (baggerToSalesLoss > 0) {
+      blame.push({
+        stage: "Transit (Bagger→Sales)",
+        loss: baggerToSalesLoss,
+        reason: `Bagger released ${bag?.total ?? 0} but sales received ${sale?.received ?? 0}`,
+      });
+    }
+    if (salesLoss > 0) {
+      blame.push({
+        stage: "Sales",
+        loss: salesLoss,
+        reason: `Sales received ${sale?.received ?? 0} but sold ${sale?.total ?? 0}`,
+      });
+    }
+    if (salesToDeliveryLoss > 0) {
+      blame.push({
+        stage: "Transit (Sales→Delivery)",
+        loss: salesToDeliveryLoss,
+        reason: `Sales released ${sale?.total ?? 0} but delivery took ${del?.received ?? 0}`,
+      });
+    }
+    if (deliveryLoss > 0) {
+      blame.push({
+        stage: "Delivery",
+        loss: deliveryLoss,
+        reason: `Delivery took ${del?.received ?? 0} but delivered ${del?.total ?? 0}`,
+      });
+    }
+
+    analysis.push({
+      breadType,
+      produced,
+      bagged: bag?.total ?? 0,
+      sold: sale?.total ?? 0,
+      delivered: del?.total ?? 0,
+      totalLoss: produced - (del?.total ?? 0),
+      blame: blame.length > 0 ? blame : [{ stage: "None", loss: 0, reason: "No discrepancies" }],
+    });
+  });
+
+  res.json({ date: dateStr || new Date().toISOString().slice(0, 10), analysis });
+});
+
 app.get("/api/staff/my-submissions", authRequired, (req, res) => {
   const production = db
     .prepare(
@@ -1269,34 +1371,60 @@ app.get("/api/staff/my-submissions", authRequired, (req, res) => {
   res.json({ production, bagging, sales, delivery });
 });
 
-app.get("/api/admin/all-submissions", authRequired, (req, res) => {
+app.get("/api/admin/all-submissions", authRequired, async (req, res) => {
   if (req.user.role !== "admin") {
     return res.status(403).json({ error: "Admins only" });
   }
-  const production = db
-    .prepare(
-      `SELECT id, bread_type, produced_count, expected_output, difference, created_at, user_id
-       FROM production_logs ORDER BY created_at DESC`
-    )
-    .all();
-  const bagging = db
-    .prepare(
-      `SELECT id, bread_type, received_count, bagged_count, difference, created_at, user_id
-       FROM bagging_logs ORDER BY created_at DESC`
-    )
-    .all();
-  const sales = db
-    .prepare(
-      `SELECT id, bread_type, received_for_sales, total_sold, difference, created_at, user_id
-       FROM sales_logs ORDER BY created_at DESC`
-    )
-    .all();
-  const delivery = db
-    .prepare(
-      `SELECT id, bread_type, taken_count, total_delivered, difference, created_at, user_id
-       FROM delivery_logs ORDER BY created_at DESC`
-    )
-    .all();
+
+  // Use PostgreSQL if available, otherwise fall back to SQLite
+  let production, bagging, sales, delivery;
+
+  if (pgPool) {
+    try {
+      const pgRes = await Promise.all([
+        pgPool.query("SELECT id, bread_type, produced_count, expected_output, difference, created_at, user_id FROM production_logs ORDER BY created_at DESC"),
+        pgPool.query("SELECT id, bread_type, received_count, bagged_count, difference, created_at, user_id FROM bagging_logs ORDER BY created_at DESC"),
+        pgPool.query("SELECT id, bread_type, received_for_sales, total_sold, difference, created_at, user_id FROM sales_logs ORDER BY created_at DESC"),
+        pgPool.query("SELECT id, bread_type, taken_count, total_delivered, difference, created_at, user_id FROM delivery_logs ORDER BY created_at DESC"),
+      ]);
+      production = pgRes[0].rows || [];
+      bagging = pgRes[1].rows || [];
+      sales = pgRes[2].rows || [];
+      delivery = pgRes[3].rows || [];
+    } catch (error) {
+      console.error("PG query failed, falling back to SQLite:", error.message);
+      // Fall through to SQLite
+    }
+  }
+
+  // Fallback to SQLite
+  if (!production) {
+    production = db
+      .prepare(
+        `SELECT id, bread_type, produced_count, expected_output, difference, created_at, user_id
+         FROM production_logs ORDER BY created_at DESC`
+      )
+      .all();
+    bagging = db
+      .prepare(
+        `SELECT id, bread_type, received_count, bagged_count, difference, created_at, user_id
+         FROM bagging_logs ORDER BY created_at DESC`
+      )
+      .all();
+    sales = db
+      .prepare(
+        `SELECT id, bread_type, received_for_sales, total_sold, difference, created_at, user_id
+         FROM sales_logs ORDER BY created_at DESC`
+      )
+      .all();
+    delivery = db
+      .prepare(
+        `SELECT id, bread_type, taken_count, total_delivered, difference, created_at, user_id
+         FROM delivery_logs ORDER BY created_at DESC`
+      )
+      .all();
+  }
+
   res.json({ production, bagging, sales, delivery });
 });
 

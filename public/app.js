@@ -119,7 +119,7 @@ function renderFormsByRole() {
       event.preventDefault();
       const fd = new FormData(el.productionForm);
       const body = Object.fromEntries(fd.entries());
-      await submitStaff("/api/production", body, "Production submitted");
+      await submitStaff("/api/production", body, "Production submitted", el.productionForm);
     };
   }
 
@@ -137,7 +137,7 @@ function renderFormsByRole() {
     el.baggingForm.onsubmit = async (event) => {
       event.preventDefault();
       const fd = new FormData(el.baggingForm);
-      await submitStaff("/api/bagging", Object.fromEntries(fd.entries()), "Bagging submitted");
+      await submitStaff("/api/bagging", Object.fromEntries(fd.entries()), "Bagging submitted", el.baggingForm);
     };
   }
 
@@ -155,7 +155,7 @@ function renderFormsByRole() {
     el.salesForm.onsubmit = async (event) => {
       event.preventDefault();
       const fd = new FormData(el.salesForm);
-      await submitStaff("/api/sales", Object.fromEntries(fd.entries()), "Sales submitted");
+      await submitStaff("/api/sales", Object.fromEntries(fd.entries()), "Sales submitted", el.salesForm);
     };
   }
 
@@ -174,18 +174,19 @@ function renderFormsByRole() {
     el.deliveryForm.onsubmit = async (event) => {
       event.preventDefault();
       const fd = new FormData(el.deliveryForm);
-      await submitStaff("/api/delivery", Object.fromEntries(fd.entries()), "Delivery submitted");
+      await submitStaff("/api/delivery", Object.fromEntries(fd.entries()), "Delivery submitted", el.deliveryForm);
     };
   }
 
   buildQuickNav();
 }
 
-async function submitStaff(path, body, successMessage) {
+async function submitStaff(path, body, successMessage, form) {
   try {
     const result = await api(path, { method: "POST", body: JSON.stringify(body) });
     const adminNote = state.user?.role === "baker" ? " Sent to admin dashboard." : "";
-    showToast(`${successMessage}. Difference: ${result.difference ?? 0}.${adminNote}`);
+    showToast(`${successMessage}.${adminNote}`);
+    if (form) form.reset();
     renderStaffSubmissionPreview(body, result);
   } catch (error) {
     showToast(error.message);
@@ -964,14 +965,13 @@ async function loadBatchHistory() {
     
     el.batchHistory.innerHTML = `<table>
       <thead><tr>
-        <th>Date</th><th>Stage</th><th>Bread Type</th><th>Quantity</th><th>Difference</th>
+        <th>Date</th><th>Stage</th><th>Bread Type</th><th>Quantity</th>
       </tr></thead>
       <tbody>${filtered.map(row => `<tr>
         <td>${row.created_at.slice(0, 10)}</td>
         <td>${row.stage}</td>
         <td>${row.bread_type}</td>
         <td>${row.produced_count || row.bagged_count || row.total_sold || row.total_delivered || '—'}</td>
-        <td style="font-weight:600;color:${row.difference > 0 ? '#dc2626' : '#15803d'}">${row.difference > 0 ? '+' : ''}${row.difference}</td>
       </tr>`).join('')}</tbody>
     </table>`;
   } catch (err) {

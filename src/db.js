@@ -445,18 +445,19 @@ async function ensureSyncComplete() {
     // Local/dev mode can run on SQLite without PostgreSQL.
     return;
   }
-  
-  // If sync is already in flight, wait for it
-  if (syncInFlight) {
+
+  // Wait for the current in-flight sync. After it resolves, its .finally() handler
+  // may have already kicked off a follow-up sync (for data queued while the first was running).
+  // Loop until there is nothing left to wait for.
+  while (syncInFlight) {
     await syncInFlight;
-    return;
   }
-  
-  // If there's a queued sync, trigger it and wait
+
+  // If a sync was queued (i.e. we hit a concurrent-write window), trigger it now and wait.
   if (syncQueued) {
     syncQueued = false;
     queueSupabaseSync();
-    if (syncInFlight) {
+    while (syncInFlight) {
       await syncInFlight;
     }
   }

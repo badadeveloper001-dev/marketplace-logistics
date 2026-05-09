@@ -16,6 +16,10 @@ const {
   maybeRecordDiscrepancy,
   toDateBounds,
   getDailyTotalsByBread,
+  pgPool,
+  pgDirectInsert,
+  pgDirectDelete,
+  pgDirectUpdate,
 } = require("./db");
 
 const app = express();
@@ -234,7 +238,9 @@ app.post("/api/auth/change-password", authRequired, (req, res) => {
   }
   const newHash = bcrypt.hashSync(newPassword, 10);
   db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(newHash, req.user.id);
-  queueSupabaseSync();
+  pgDirectUpdate("users", req.user.id, { password_hash: newHash }).catch((err) =>
+    console.error("PG password update failed:", err.message)
+  );
   res.json({ ok: true });
 });
 
@@ -356,9 +362,36 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
     userId: req.user.id,
   });
 
-  const createdAt = db
+  let createdAt = db
     .prepare("SELECT created_at FROM production_logs WHERE id = ?")
     .get(info.lastInsertRowid).created_at;
+
+  // Write directly to PostgreSQL (single INSERT — no full-table sync)
+  try {
+    const pgRow = await pgDirectInsert("production_logs", {
+      user_id: req.user.id,
+      bread_type: breadType,
+      flour_bags: flour,
+      expected_output: expectedOutput,
+      produced_count: produced,
+      sugar: ingSugar,
+      salt: ingSalt,
+      preservative: ingPreservative,
+      butter: ingButter,
+      yeast: ingYeast,
+      vegetable_oil: ingVegetableOil,
+      improver: ingImprover,
+      difference,
+      flagged,
+      severity,
+    });
+    if (pgRow) createdAt = pgRow.created_at;
+  } catch (error) {
+    console.error("PG insert failed during production submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
+    }
+  }
 
   maybeSendCriticalAlertEmail({
     stage: "production",
@@ -369,16 +402,6 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
     staffRole: req.user.role,
     createdAt,
   });
-  queueSupabaseSync();
-
-  try {
-    await ensureSyncComplete();
-  } catch (error) {
-    console.error("Sync failed during production submission:", error.message);
-    if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
-    }
-  }
 
   res.status(201).json({
     id: info.lastInsertRowid,
@@ -427,8 +450,26 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), async (req, res) 
     userId: req.user.id,
   });
 
-  const createdAt = db.prepare("SELECT created_at FROM bagging_logs WHERE id = ?").get(info.lastInsertRowid)
+  let createdAt = db.prepare("SELECT created_at FROM bagging_logs WHERE id = ?").get(info.lastInsertRowid)
     .created_at;
+
+  try {
+    const pgRow = await pgDirectInsert("bagging_logs", {
+      user_id: req.user.id,
+      bread_type: breadType,
+      received_count: received,
+      bagged_count: bagged,
+      difference,
+      flagged,
+      severity,
+    });
+    if (pgRow) createdAt = pgRow.created_at;
+  } catch (error) {
+    console.error("PG insert failed during bagging submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
+    }
+  }
 
   maybeSendCriticalAlertEmail({
     stage: "bagging",
@@ -439,16 +480,6 @@ app.post("/api/bagging", authRequired, roleRequired("bagger"), async (req, res) 
     staffRole: req.user.role,
     createdAt,
   });
-  queueSupabaseSync();
-
-  try {
-    await ensureSyncComplete();
-  } catch (error) {
-    console.error("Sync failed during bagging submission:", error.message);
-    if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
-    }
-  }
 
   res.status(201).json({
     id: info.lastInsertRowid,
@@ -520,8 +551,28 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
     userId: req.user.id,
   });
 
-  const createdAt = db.prepare("SELECT created_at FROM sales_logs WHERE id = ?").get(info.lastInsertRowid)
+  let createdAt = db.prepare("SELECT created_at FROM sales_logs WHERE id = ?").get(info.lastInsertRowid)
     .created_at;
+
+  try {
+    const pgRow = await pgDirectInsert("sales_logs", {
+      user_id: req.user.id,
+      bread_type: breadType,
+      received_for_sales: receivedForSales,
+      paid_count: paid,
+      credit_count: credit,
+      total_sold: totalSold,
+      difference,
+      flagged,
+      severity,
+    });
+    if (pgRow) createdAt = pgRow.created_at;
+  } catch (error) {
+    console.error("PG insert failed during sales submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
+    }
+  }
 
   maybeSendCriticalAlertEmail({
     stage: "sales",
@@ -532,16 +583,6 @@ app.post("/api/sales", authRequired, roleRequired("sales"), async (req, res) => 
     staffRole: req.user.role,
     createdAt,
   });
-  queueSupabaseSync();
-
-  try {
-    await ensureSyncComplete();
-  } catch (error) {
-    console.error("Sync failed during sales submission:", error.message);
-    if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
-    }
-  }
 
   res.status(201).json({
     id: info.lastInsertRowid,
@@ -592,9 +633,29 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), async (req, re
     userId: req.user.id,
   });
 
-  const createdAt = db
+  let createdAt = db
     .prepare("SELECT created_at FROM delivery_logs WHERE id = ?")
     .get(info.lastInsertRowid).created_at;
+
+  try {
+    const pgRow = await pgDirectInsert("delivery_logs", {
+      user_id: req.user.id,
+      bread_type: breadType,
+      taken_count: taken,
+      paid_count: paid,
+      credit_count: credit,
+      total_delivered: totalDelivered,
+      difference,
+      flagged,
+      severity,
+    });
+    if (pgRow) createdAt = pgRow.created_at;
+  } catch (error) {
+    console.error("PG insert failed during delivery submission:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
+    }
+  }
 
   maybeSendCriticalAlertEmail({
     stage: "delivery",
@@ -605,16 +666,6 @@ app.post("/api/delivery", authRequired, roleRequired("delivery"), async (req, re
     staffRole: req.user.role,
     createdAt,
   });
-  queueSupabaseSync();
-
-  try {
-    await ensureSyncComplete();
-  } catch (error) {
-    console.error("Sync failed during delivery submission:", error.message);
-    if (IS_VERCEL) {
-      return res.status(500).json({ error: "Failed to persist submission", detail: error.message });
-    }
-  }
 
   res.status(201).json({
     id: info.lastInsertRowid,
@@ -676,15 +727,18 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, re
   const created = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?")
     .get(info.lastInsertRowid);
-  
-  queueSupabaseSync();
-  
+
   try {
-    await ensureSyncComplete();
+    await pgDirectInsert("users", {
+      name,
+      email: email || null,
+      phone: normalizedPhone,
+      username,
+      password_hash: passwordHash,
+      role,
+    });
   } catch (error) {
-    console.error("Sync failed during staff creation:", error.message);
-    // On Vercel, if sync to PostgreSQL fails, data will be lost when instance restarts
-    // So we must throw an error instead of silently failing
+    console.error("PG insert failed during staff creation:", error.message);
     if (IS_VERCEL) {
       return res.status(500).json({ error: "Failed to persist staff data. Please try again." });
     }
@@ -709,19 +763,22 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
   deleteUserAndRelatedRecords(id);
-  queueSupabaseSync();
-  
+
   try {
-    await ensureSyncComplete();
+    if (pgPool) {
+      const tables = ["production_logs", "bagging_logs", "sales_logs", "delivery_logs", "discrepancies"];
+      await Promise.all(tables.map((t) =>
+        pgPool.query(`DELETE FROM ${t} WHERE user_id = $1`, [id]).catch(() => null)
+      ));
+      await pgDirectDelete("users", id);
+    }
   } catch (error) {
-    console.error("Sync failed during staff deletion:", error.message);
-    // On Vercel, if sync to PostgreSQL fails, data will be lost when instance restarts
-    // So we must throw an error instead of silently failing
+    console.error("PG delete failed during staff deletion:", error.message);
     if (IS_VERCEL) {
       return res.status(500).json({ error: "Failed to persist deletion. Please try again." });
     }
   }
-  
+
   res.json({ deleted: id });
 });
 

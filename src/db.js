@@ -737,6 +737,45 @@ function getSeverity(absDifference) {
   return null;
 }
 
+/**
+ * Insert a single row directly into PostgreSQL (no full-table sync).
+ * `row` must NOT include `id` or `created_at` — PG generates those.
+ * Returns { id, created_at } from PG, or null when not using PostgreSQL.
+ */
+async function pgDirectInsert(tableName, row) {
+  if (!pgPool) return null;
+  const cols = Object.keys(row);
+  const vals = cols.map((c) => row[c]);
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+  const result = await pgPool.query(
+    `INSERT INTO ${tableName} (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id, created_at`,
+    vals
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Delete a single row directly from PostgreSQL by id.
+ */
+async function pgDirectDelete(tableName, id) {
+  if (!pgPool) return;
+  await pgPool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
+}
+
+/**
+ * Update a column directly in PostgreSQL.
+ */
+async function pgDirectUpdate(tableName, id, columnValuePairs) {
+  if (!pgPool) return;
+  const cols = Object.keys(columnValuePairs);
+  const vals = cols.map((c) => columnValuePairs[c]);
+  const setClause = cols.map((c, i) => `${c} = $${i + 1}`).join(", ");
+  await pgPool.query(
+    `UPDATE ${tableName} SET ${setClause} WHERE id = $${cols.length + 1}`,
+    [...vals, id]
+  );
+}
+
 function maybeRecordDiscrepancy({ stage, refTable, refId, breadType, difference, userId }) {
   const absDifference = Math.abs(difference);
   const severity = getSeverity(absDifference);
@@ -746,6 +785,15 @@ function maybeRecordDiscrepancy({ stage, refTable, refId, breadType, difference,
     `INSERT INTO discrepancies (stage, ref_table, ref_id, bread_type, difference, user_id, severity)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(stage, refTable, refId, breadType, difference, userId, severity);
+
+  // Fire-and-forget direct insert to PostgreSQL (no full-table sync needed)
+  if (pgPool) {
+    pgPool.query(
+      `INSERT INTO discrepancies (stage, ref_table, ref_id, bread_type, difference, user_id, severity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [stage, refTable, refId, breadType, difference, userId, severity]
+    ).catch((err) => console.error("PG discrepancy insert failed:", err.message));
+  }
 }
 
 function toDateBounds(dateText) {
@@ -807,6 +855,10 @@ module.exports = {
   db,
   initDb,
   USE_POSTGRES,
+  pgPool,
+  pgDirectInsert,
+  pgDirectDelete,
+  pgDirectUpdate,
   queueSupabaseSync,
   ensureSyncComplete,
   checkPostgresConnection,

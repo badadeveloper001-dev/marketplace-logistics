@@ -7,9 +7,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -87,9 +84,6 @@
             <div class="topbar-logo-crop">
               <img src="/image.png" alt="BigCat Bakery" class="topbar-logo-img" />
             </div>
-              <circle cx="112" cy="92" r="4" fill="currentColor"/>
-              <circle cx="100" cy="104" r="3" fill="currentColor"/>
-            </svg>
             <div class="user-avatar" id="userAvatar"></div>
             <div>
               <div class="topbar-title" id="welcomeTitle"></div>
@@ -201,17 +195,23 @@
             <div id="adminCounts" class="admin-counts"></div>
             <div id="alertSummary" class="admin-alert-summary"></div>
             <div id="topDiscrepancies" class="top-discrepancies"></div>
-\n          <article id="blameAnalysisCard" class="card" data-nav-label="Blame Analysis">\n            <div class="row-between">\n              <h3>Root Cause Analysis</h3>\n              <label class="inline-date">\n                Date\n                <input id="blameAnalysisDate" type="date" />\n              </label>\n            </div>\n            <p class="muted">Identify which stage is responsible for bread loss in the supply chain.</p>\n            <button id="loadBlameAnalysisBtn" style="margin-top:0.5rem">Analyze Discrepancies</button>\n            <div id="blameAnalysisResults" style="margin-top:1rem"></div>\n          </article>
           </article>
-\n          <article id="blameAnalysisCard" class="card" data-nav-label="Blame Analysis">\n            <div class="row-between">\n              <h3>Root Cause Analysis</h3>\n              <label class="inline-date">\n                Date\n                <input id="blameAnalysisDate" type="date" />\n              </label>\n            </div>\n            <p class="muted">Identify which stage is responsible for bread loss in the supply chain.</p>\n            <button id="loadBlameAnalysisBtn" style="margin-top:0.5rem">Analyze Discrepancies</button>\n            <div id="blameAnalysisResults" style="margin-top:1rem"></div>\n          </article>
 
           <article id="blameAnalysisCard" class="card" data-nav-label="Blame Analysis">
             <div class="row-between">
               <h3>Root Cause Analysis</h3>
-              <label class="inline-date">
-                Date
-                <input id="blameAnalysisDate" type="date" />
-              </label>
+              <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+                <label class="inline-date">
+                  Date
+                  <input id="blameAnalysisDate" type="date" />
+                </label>
+                <label class="inline-date">
+                  Bread Type
+                  <select id="blameAnalysisBreadType" style="min-width:130px;">
+                    <option value="">All Types</option>
+                  </select>
+                </label>
+              </div>
             </div>
             <p class="muted">Identify which stage is responsible for bread loss in the supply chain.</p>
             <button id="loadBlameAnalysisBtn" style="margin-top:0.5rem">Analyze Discrepancies</button>

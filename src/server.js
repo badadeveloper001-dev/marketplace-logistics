@@ -105,6 +105,11 @@ function asNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+function createStaffUsernameFromPhone(normalizedPhone) {
+  // Use full normalized phone to avoid collisions across different numbers.
+  return `staff_${normalizedPhone}`;
+}
+
 function createUserSafe(row) {
   return {
     id: row.id,
@@ -705,11 +710,27 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, re
   // Default password = last 4 digits of the normalized phone number
   const last4 = normalizedPhone.slice(-4);
   const passwordHash = bcrypt.hashSync(last4, 10);
-  const username = `staff_${normalizedPhone.slice(-6)}`;
+  const username = createStaffUsernameFromPhone(normalizedPhone);
 
-  const info = db
-    .prepare("INSERT INTO users (name, email, phone, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(name, email || null, normalizedPhone, username, passwordHash, role);
+  let info;
+  try {
+    info = db
+      .prepare("INSERT INTO users (name, email, phone, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(name, email || null, normalizedPhone, username, passwordHash, role);
+  } catch (error) {
+    // Prevent route crash on SQLite constraint conflicts and return clear API errors.
+    if (String(error.message || "").includes("users.username")) {
+      return res.status(409).json({ error: "A staff account with this phone pattern already exists" });
+    }
+    if (String(error.message || "").includes("users.phone")) {
+      return res.status(409).json({ error: "A user with that phone number already exists" });
+    }
+    if (String(error.message || "").includes("users.email")) {
+      return res.status(409).json({ error: "A user with that email already exists" });
+    }
+    console.error("SQLite insert failed during staff creation:", error.message);
+    return res.status(500).json({ error: "Failed to create staff account. Please try again." });
+  }
 
   const created = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?")
@@ -727,6 +748,8 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, re
   } catch (error) {
     console.error("PG insert failed during staff creation:", error.message);
     if (IS_VERCEL) {
+      // Keep durability guarantees on Vercel by rolling back local write if PG write fails.
+      db.prepare("DELETE FROM users WHERE id = ?").run(info.lastInsertRowid);
       return res.status(500).json({ error: "Failed to persist staff data. Please try again." });
     }
   }
@@ -1226,6 +1249,9 @@ app.get("/api/admin/adjustments", authRequired, roleRequired("admin"), (req, res
 
 app.get("/api/admin/blame-analysis", authRequired, roleRequired("admin"), (req, res) => {
   const { date: dateStr, breadType: filterBreadType } = req.query;
+  if (filterBreadType && !validateBreadType(filterBreadType)) {
+    return badRequest(res, "Invalid bread type filter");
+  }
   const { start, end } = toDateBounds(dateStr);
 
   // Collect all submissions from each stage for the period
@@ -1264,7 +1290,7 @@ app.get("/api/admin/blame-analysis", authRequired, roleRequired("admin"), (req, 
   // Perform root-cause analysis
   const analysis = [];
 
-  const allBreadTypes = new Set();
+  const allBreadTypes = new Set(filterBreadType ? [filterBreadType] : Object.keys(BREAD_TYPES));
   [...prodRows, ...bagRows, ...saleRows, ...delRows].forEach((r) => allBreadTypes.add(r.bread_type));
 
   allBreadTypes.forEach((breadType) => {
@@ -1274,65 +1300,98 @@ app.get("/api/admin/blame-analysis", authRequired, roleRequired("admin"), (req, 
     const del = delRows.find((r) => r.bread_type === breadType);
 
     const produced = prod?.total ?? 0;
-    const bakerLoss = produced - (bag?.received ?? 0);
-    const baggerLoss = (bag?.received ?? 0) - (bag?.total ?? 0);
-    const baggerToSalesLoss = (bag?.total ?? 0) - (sale?.received ?? 0);
-    const salesLoss = (sale?.received ?? 0) - (sale?.total ?? 0);
-    const salesToDeliveryLoss = (sale?.total ?? 0) - (del?.received ?? 0);
-    const deliveryLoss = (del?.received ?? 0) - (del?.total ?? 0);
+    const baggerReceived = bag?.received ?? 0;
+    const bagged = bag?.total ?? 0;
+    const salesReceived = sale?.received ?? 0;
+    const sold = sale?.total ?? 0;
+    const deliveryTaken = del?.received ?? 0;
+    const delivered = del?.total ?? 0;
+
+    const bakerLoss = produced - baggerReceived;
+    const baggerLoss = baggerReceived - bagged;
+    const baggerToSalesLoss = bagged - salesReceived;
+    const salesLoss = salesReceived - sold;
+    const salesToDeliveryLoss = sold - deliveryTaken;
+    const deliveryLoss = deliveryTaken - delivered;
 
     const blame = [];
+    const dataGaps = [];
     if (bakerLoss > 0) {
       blame.push({
         stage: "Baker",
         loss: bakerLoss,
-        reason: `Baker produced ${produced} but bagger only received ${bag?.received ?? 0}`,
+        reason: `Baker produced ${produced} but bagger only received ${baggerReceived}`,
       });
     }
     if (baggerLoss > 0) {
       blame.push({
         stage: "Bagger",
         loss: baggerLoss,
-        reason: `Bagger received ${bag?.received ?? 0} but bagged ${bag?.total ?? 0}`,
+        reason: `Bagger received ${baggerReceived} but bagged ${bagged}`,
       });
     }
     if (baggerToSalesLoss > 0) {
       blame.push({
         stage: "Transit (Bagger→Sales)",
         loss: baggerToSalesLoss,
-        reason: `Bagger released ${bag?.total ?? 0} but sales received ${sale?.received ?? 0}`,
+        reason: `Bagger released ${bagged} but sales received ${salesReceived}`,
       });
     }
     if (salesLoss > 0) {
       blame.push({
         stage: "Sales",
         loss: salesLoss,
-        reason: `Sales received ${sale?.received ?? 0} but sold ${sale?.total ?? 0}`,
+        reason: `Sales received ${salesReceived} but sold ${sold}`,
       });
     }
     if (salesToDeliveryLoss > 0) {
       blame.push({
         stage: "Transit (Sales→Delivery)",
         loss: salesToDeliveryLoss,
-        reason: `Sales released ${sale?.total ?? 0} but delivery took ${del?.received ?? 0}`,
+        reason: `Sales released ${sold} but delivery took ${deliveryTaken}`,
       });
     }
     if (deliveryLoss > 0) {
       blame.push({
         stage: "Delivery",
         loss: deliveryLoss,
-        reason: `Delivery took ${del?.received ?? 0} but delivered ${del?.total ?? 0}`,
+        reason: `Delivery took ${deliveryTaken} but delivered ${delivered}`,
       });
     }
+
+    if (produced > 0 && baggerReceived === 0) {
+      dataGaps.push("No bagger received logs for produced loaves");
+    }
+    if (bagged > 0 && salesReceived === 0) {
+      dataGaps.push("No sales received logs for bagged loaves");
+    }
+    if (sold > 0 && deliveryTaken === 0) {
+      dataGaps.push("No delivery intake logs for sold loaves");
+    }
+
+    const hasData = produced > 0 || baggerReceived > 0 || bagged > 0 || salesReceived > 0 || sold > 0 || deliveryTaken > 0 || delivered > 0;
+    const confidence = !hasData ? "none" : dataGaps.length ? "medium" : "high";
 
     analysis.push({
       breadType,
       produced,
-      bagged: bag?.total ?? 0,
-      sold: sale?.total ?? 0,
-      delivered: del?.total ?? 0,
-      totalLoss: produced - (del?.total ?? 0),
-      blame: blame.length > 0 ? blame : [{ stage: "None", loss: 0, reason: "No discrepancies" }],
+      bagged,
+      sold,
+      delivered,
+      totalLoss: produced - delivered,
+      hasData,
+      confidence,
+      dataGaps,
+      flow: {
+        produced,
+        baggerReceived,
+        bagged,
+        salesReceived,
+        sold,
+        deliveryTaken,
+        delivered,
+      },
+      blame: blame.length > 0 ? blame : [{ stage: "None", loss: 0, reason: hasData ? "No discrepancies" : "No submissions recorded for selected date" }],
     });
   });
 

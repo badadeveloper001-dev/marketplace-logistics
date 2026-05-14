@@ -58,6 +58,7 @@ const el = {
   changePasswordForm: document.getElementById("changePasswordForm"),
   blameAnalysisCard: document.getElementById("blameAnalysisCard"),
   blameAnalysisDate: document.getElementById("blameAnalysisDate"),
+  blameAnalysisBreadType: document.getElementById("blameAnalysisBreadType"),
   loadBlameAnalysisBtn: document.getElementById("loadBlameAnalysisBtn"),
   blameAnalysisResults: document.getElementById("blameAnalysisResults"),
 };
@@ -573,6 +574,11 @@ function initCreateStaffForm() {
   if (!form) return;
   form.onsubmit = async (e) => {
     e.preventDefault();
+    const submitBtn = form.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating...";
+    }
     const fd = new FormData(form);
     const body = Object.fromEntries(fd.entries());
     try {
@@ -582,6 +588,11 @@ function initCreateStaffForm() {
       loadStaffList();
     } catch (err) {
       showToast(err.message);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Create Staff Account";
+      }
     }
   };
 }
@@ -787,9 +798,14 @@ async function refreshAdmin() {
 }
 
 async function loadBlameAnalysis() {
+  if (!el.blameAnalysisResults) return;
   const date = el.blameAnalysisDate.value || new Date().toISOString().slice(0, 10);
+  const breadType = el.blameAnalysisBreadType?.value || "";
+  const params = new URLSearchParams({ date });
+  if (breadType) params.set("breadType", breadType);
+  el.blameAnalysisResults.innerHTML = '<p class="muted">Analyzing flow and discrepancies...</p>';
   try {
-    const result = await api(`/api/admin/blame-analysis?date=${date}`);
+    const result = await api(`/api/admin/blame-analysis?${params.toString()}`);
     const { analysis } = result;
 
     if (!analysis || analysis.length === 0) {
@@ -799,14 +815,26 @@ async function loadBlameAnalysis() {
 
     let html = '<div style="display: grid; gap: 1.5rem;">';
     analysis.forEach((item) => {
-      const totalLoss = item.totalLoss || 0;
-      const status = totalLoss === 0 ? 'ok' : totalLoss > 5 ? 'critical' : 'warning';
+      const totalLoss = Number(item.totalLoss) || 0;
+      const hasData = Boolean(item.hasData);
+      const confidence = String(item.confidence || (hasData ? "high" : "none"));
+      const status = !hasData ? 'ok' : totalLoss === 0 ? 'ok' : totalLoss > 5 ? 'critical' : 'warning';
+      const flow = item.flow || {};
+      const dominant = (item.blame || []).reduce((top, current) => {
+        const currentLoss = Number(current?.loss) || 0;
+        return currentLoss > (Number(top?.loss) || 0) ? current : top;
+      }, null);
+      const dominantText = !hasData
+        ? "No records submitted for this date."
+        : (dominant && Number(dominant.loss) > 0)
+          ? `Likely root cause: ${dominant.stage} (${dominant.loss} loaves)`
+          : "No loss detected across stages.";
       
       let blameHtml = '';
       if (item.blame && Array.isArray(item.blame)) {
         blameHtml = item.blame.map(b => `
-          <div style="padding: 0.75rem; background: #f0f0f0; border-left: 3px solid #ff6b6b; margin: 0.5rem 0;">
-            <strong>${b.stage}</strong> - Lost: <strong>${b.loss}</strong> loaves<br/>
+          <div style="padding: 0.75rem; background: #f0f0f0; border-left: 3px solid ${Number(b.loss) > 0 ? '#ff6b6b' : '#22c55e'}; margin: 0.5rem 0;">
+            <strong>${b.stage}</strong> - Impact: <strong>${b.loss}</strong> loaves<br/>
             <small style="color: #666;">${b.reason}</small>
           </div>
         `).join('');
@@ -816,11 +844,16 @@ async function loadBlameAnalysis() {
         <div style="border: 1px solid #ddd; border-radius: 8px; padding: 1rem; background: #fafafa;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
             <strong>${item.breadType}</strong>
-            <span class="badge ${status}">${totalLoss === 0 ? 'OK' : totalLoss > 0 ? 'LOSS: ' + totalLoss : ''}</span>
+            <div style="display:flex; gap:0.45rem; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+              <span class="badge ${status}">${!hasData ? 'NO DATA' : totalLoss === 0 ? 'OK' : totalLoss > 0 ? 'LOSS: ' + totalLoss : 'NET GAIN: ' + Math.abs(totalLoss)}</span>
+              <span class="badge ${confidence === 'high' ? 'ok' : 'warning'}">CONFIDENCE: ${confidence.toUpperCase()}</span>
+            </div>
           </div>
+          <p class="muted" style="margin:0 0 0.75rem 0;">${dominantText}</p>
           <div style="background: #f5f5f5; padding: 0.5rem; border-radius: 4px; font-size: 0.9rem; margin-bottom: 0.75rem;">
-            Baker: ${item.produced} → Bagger: ${item.bagged} → Sales: ${item.sold} → Delivery: ${item.delivered}
+            Baker Produced: ${flow.produced ?? item.produced} → Bagger Received: ${flow.baggerReceived ?? 0} → Bagger Bagged: ${flow.bagged ?? item.bagged} → Sales Received: ${flow.salesReceived ?? 0} → Sales Sold: ${flow.sold ?? item.sold} → Delivery Taken: ${flow.deliveryTaken ?? 0} → Delivery Delivered: ${flow.delivered ?? item.delivered}
           </div>
+          ${Array.isArray(item.dataGaps) && item.dataGaps.length ? `<div style="background:#fff5f5; border:1px solid #fecaca; color:#991b1b; padding:0.55rem 0.7rem; border-radius:6px; margin-bottom:0.75rem; font-size:0.86rem;"><strong>Data gaps:</strong> ${item.dataGaps.join('; ')}</div>` : ''}
           ${blameHtml || '<p class="muted" style="margin: 0;">No discrepancies</p>'}
         </div>
       `;
@@ -829,7 +862,7 @@ async function loadBlameAnalysis() {
 
     el.blameAnalysisResults.innerHTML = html;
   } catch (err) {
-    el.blameAnalysisResults.innerHTML = `<p class="muted">Error: ${err.message}</p>`;
+    el.blameAnalysisResults.innerHTML = `<p class="muted">Error loading analysis: ${err.message}</p>`;
   }
 }
 
@@ -1063,9 +1096,22 @@ async function afterAuth() {
     } catch (error) {
       showToast(error.message || "Unable to load admin submissions");
     }
-    // Setup blame analysis card
-    el.blameAnalysisDate.value = new Date().toISOString().slice(0, 10);
-    el.loadBlameAnalysisBtn.onclick = () => loadBlameAnalysis();
+    // Setup and run root cause analysis on first admin load.
+    if (el.blameAnalysisDate) {
+      el.blameAnalysisDate.value = el.reportDate.value || new Date().toISOString().slice(0, 10);
+    }
+    if (el.blameAnalysisBreadType && !el.blameAnalysisBreadType.querySelector("option[value='Jumbo']")) {
+      Object.keys(state.breadTypes).forEach((type) => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type;
+        el.blameAnalysisBreadType.appendChild(option);
+      });
+    }
+    if (el.loadBlameAnalysisBtn) {
+      el.loadBlameAnalysisBtn.onclick = () => loadBlameAnalysis();
+    }
+    await loadBlameAnalysis();
   } else {
     renderFormsByRole();
     // Show change-password card for staff (not admin)

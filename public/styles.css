@@ -313,7 +313,7 @@ p  { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65; }
   font-size: 0.82rem;
   font-family: var(--font);
   font-weight: 700;
-  color: var(--accent);
+  color: #ffffff;
   margin-bottom: 0.4rem;
 }
 

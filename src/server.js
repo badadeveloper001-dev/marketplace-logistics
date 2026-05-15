@@ -165,6 +165,68 @@ function maybeSendCriticalAlertEmail(payload) {
     });
 }
 
+function computeFinancialSummary(dateText) {
+  const date = dateText || new Date().toISOString().slice(0, 10);
+  const totals = getDailyTotalsByBread(date);
+
+  const byBreadType = totals.map((row) => {
+    const unitPrice = BREAD_TYPES[row.breadType].price;
+    const missingBreads =
+      Math.max(0, row.produced - row.bagged) +
+      Math.max(0, row.bagged - row.sold) +
+      Math.max(0, row.sold - row.delivered);
+
+    const grossSalesValue = row.sold * unitPrice;
+    const deliveredValue = row.delivered * unitPrice;
+    const financialLoss = missingBreads * unitPrice;
+    const netAfterLoss = grossSalesValue - financialLoss;
+
+    return {
+      breadType: row.breadType,
+      unitPrice,
+      produced: row.produced,
+      bagged: row.bagged,
+      sold: row.sold,
+      delivered: row.delivered,
+      grossSalesValue,
+      deliveredValue,
+      missingBreads,
+      financialLoss,
+      netAfterLoss,
+    };
+  });
+
+  const totalsSummary = byBreadType.reduce(
+    (acc, row) => {
+      acc.totalProduced += row.produced;
+      acc.totalSold += row.sold;
+      acc.totalDelivered += row.delivered;
+      acc.totalGrossSalesValue += row.grossSalesValue;
+      acc.totalDeliveredValue += row.deliveredValue;
+      acc.totalMissingBreads += row.missingBreads;
+      acc.totalFinancialLoss += row.financialLoss;
+      acc.netRevenueAfterLoss += row.netAfterLoss;
+      return acc;
+    },
+    {
+      totalProduced: 0,
+      totalSold: 0,
+      totalDelivered: 0,
+      totalGrossSalesValue: 0,
+      totalDeliveredValue: 0,
+      totalMissingBreads: 0,
+      totalFinancialLoss: 0,
+      netRevenueAfterLoss: 0,
+    }
+  );
+
+  return {
+    date,
+    byBreadType,
+    ...totalsSummary,
+  };
+}
+
 app.post("/api/auth/admin-login", (req, res) => {
   const code = String(req.body.code || "").trim();
   if (!code) return badRequest(res, "Access code is required");
@@ -935,36 +997,24 @@ app.get("/api/admin/discrepancies", authRequired, roleRequired("admin"), (req, r
 });
 
 app.get("/api/admin/loss", authRequired, roleRequired("admin"), (req, res) => {
-  const day = req.query.date;
-  const totals = getDailyTotalsByBread(day);
-
-  let totalMissingBreads = 0;
-  let totalFinancialLoss = 0;
-
-  const byBreadType = totals.map((row) => {
-    const missingAtStages =
-      Math.max(0, row.produced - row.bagged) +
-      Math.max(0, row.bagged - row.sold) +
-      Math.max(0, row.sold - row.delivered);
-
-    const loss = missingAtStages * BREAD_TYPES[row.breadType].price;
-    totalMissingBreads += missingAtStages;
-    totalFinancialLoss += loss;
-
-    return {
-      breadType: row.breadType,
-      missingBreads: missingAtStages,
-      unitPrice: BREAD_TYPES[row.breadType].price,
-      loss,
-    };
-  });
+  const finance = computeFinancialSummary(req.query.date);
 
   res.json({
-    date: day || new Date().toISOString().slice(0, 10),
-    byBreadType,
-    totalMissingBreads,
-    totalFinancialLoss,
+    date: finance.date,
+    byBreadType: finance.byBreadType.map((row) => ({
+      breadType: row.breadType,
+      missingBreads: row.missingBreads,
+      unitPrice: row.unitPrice,
+      loss: row.financialLoss,
+    })),
+    totalMissingBreads: finance.totalMissingBreads,
+    totalFinancialLoss: finance.totalFinancialLoss,
   });
+});
+
+app.get("/api/admin/finance", authRequired, roleRequired("admin"), (req, res) => {
+  const finance = computeFinancialSummary(req.query.date);
+  res.json(finance);
 });
 
 app.get("/api/admin/staff-accountability", authRequired, roleRequired("admin"), (req, res) => {
@@ -1135,6 +1185,62 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
 
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="bigcat-report-${day}.csv"`);
+  res.send(csv);
+});
+
+app.get("/api/admin/export-financial-csv", authRequired, roleRequired("admin"), (req, res) => {
+  const finance = computeFinancialSummary(req.query.date);
+
+  const dataRows = finance.byBreadType.map((row) => [
+    finance.date,
+    row.breadType,
+    row.unitPrice,
+    row.produced,
+    row.bagged,
+    row.sold,
+    row.delivered,
+    row.grossSalesValue,
+    row.deliveredValue,
+    row.missingBreads,
+    row.financialLoss,
+    row.netAfterLoss,
+  ]);
+
+  dataRows.push([
+    finance.date,
+    "TOTAL",
+    "",
+    finance.totalProduced,
+    "",
+    finance.totalSold,
+    finance.totalDelivered,
+    finance.totalGrossSalesValue,
+    finance.totalDeliveredValue,
+    finance.totalMissingBreads,
+    finance.totalFinancialLoss,
+    finance.netRevenueAfterLoss,
+  ]);
+
+  const csv = rowsToCsv(
+    [
+      "date",
+      "bread_type",
+      "unit_price",
+      "produced",
+      "bagged",
+      "sold",
+      "delivered",
+      "gross_sales_value",
+      "delivered_value",
+      "missing_breads",
+      "financial_loss",
+      "net_after_loss",
+    ],
+    dataRows
+  );
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="bigcat-financial-report-${finance.date}.csv"`);
   res.send(csv);
 });
 

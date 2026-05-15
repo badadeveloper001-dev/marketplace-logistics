@@ -547,6 +547,11 @@ button.danger-btn:hover {
   line-height: 1.45;
 }
 
+.finance-summary table td,
+.finance-summary table th {
+  white-space: nowrap;
+}
+
 /* ─── Alert KPI Tiles ────────────────────────────────────────────── */
 .admin-alert-summary {
   margin-top: 1rem;

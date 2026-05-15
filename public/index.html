@@ -183,10 +183,17 @@
             <div class="row-between" style="gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
               <button id="refreshAdminBtn">Refresh Submissions</button>
               <button id="exportCsvBtn" type="button" class="ghost">Export CSV</button>
+              <button id="exportFinancialCsvBtn" type="button" class="ghost">Download Financial Report</button>
             </div>
             <div id="adminCounts" class="admin-counts"></div>
             <div id="alertSummary" class="admin-alert-summary"></div>
             <div id="topDiscrepancies" class="top-discrepancies"></div>
+          </article>
+
+          <article id="financeCard" class="card" data-nav-label="Finance">
+            <h3>Financial Monitoring</h3>
+            <p class="muted">Automatic financial summary using loaf prices: Jumbo 2000, Eco 1300, Mini 500.</p>
+            <div id="financeSummary" class="finance-summary" style="margin-top:0.75rem"></div>
           </article>
 
           <article id="blameAnalysisCard" class="card" data-nav-label="Blame Analysis">

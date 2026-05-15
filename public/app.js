@@ -37,10 +37,12 @@ const el = {
   staffList: document.getElementById("staffList"),
   refreshAdminBtn: document.getElementById("refreshAdminBtn"),
   exportCsvBtn: document.getElementById("exportCsvBtn"),
+  exportFinancialCsvBtn: document.getElementById("exportFinancialCsvBtn"),
   reportDate: document.getElementById("reportDate"),
   adminCounts: document.getElementById("adminCounts"),
   alertSummary: document.getElementById("alertSummary"),
   topDiscrepancies: document.getElementById("topDiscrepancies"),
+  financeSummary: document.getElementById("financeSummary"),
   bakerFilters: document.getElementById("bakerFilters"),
   baggerFilters: document.getElementById("baggerFilters"),
   salesFilters: document.getElementById("salesFilters"),
@@ -461,6 +463,12 @@ function formatDateTime(value) {
   return d.toLocaleString();
 }
 
+function formatCurrency(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N0";
+  return `N${numeric.toLocaleString()}`;
+}
+
 function renderSubmissionCards(rows, fields, stageLabel) {
   const safeRows = Array.isArray(rows) ? rows : [];
   if (!safeRows.length) {
@@ -630,6 +638,7 @@ function initChangePasswordForm() {
 async function refreshAdmin() {
   const date = el.reportDate.value;
   const submissions = await api(`/api/admin/submissions?date=${date}`);
+  const finance = await api(`/api/admin/finance?date=${date}`);
   const bakerRows = Array.isArray(submissions.baker) ? submissions.baker : [];
   const baggerRows = Array.isArray(submissions.bagger) ? submissions.bagger : [];
   const salesRows = Array.isArray(submissions.sales) ? submissions.sales : [];
@@ -793,6 +802,64 @@ async function refreshAdmin() {
     ],
     "Delivery"
   );
+
+  if (el.financeSummary) {
+    const rows = Array.isArray(finance.byBreadType) ? finance.byBreadType : [];
+    const financeRows = rows
+      .map(
+        (row) => `
+          <tr>
+            <td>${row.breadType}</td>
+            <td>${formatCurrency(row.unitPrice)}</td>
+            <td>${row.sold}</td>
+            <td>${formatCurrency(row.grossSalesValue)}</td>
+            <td>${row.missingBreads}</td>
+            <td>${formatCurrency(row.financialLoss)}</td>
+            <td>${formatCurrency(row.netAfterLoss)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    el.financeSummary.innerHTML = `
+      <div class="admin-alert-summary">
+        <article class="alert-kpi neutral">
+          <span>Gross Sales Value</span>
+          <strong>${formatCurrency(finance.totalGrossSalesValue)}</strong>
+        </article>
+        <article class="alert-kpi warning">
+          <span>Financial Loss</span>
+          <strong>${formatCurrency(finance.totalFinancialLoss)}</strong>
+        </article>
+        <article class="alert-kpi critical">
+          <span>Missing Breads</span>
+          <strong>${finance.totalMissingBreads}</strong>
+        </article>
+        <article class="alert-kpi danger">
+          <span>Net After Loss</span>
+          <strong>${formatCurrency(finance.netRevenueAfterLoss)}</strong>
+        </article>
+      </div>
+      <div class="scroll-table" style="margin-top:0.75rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Bread Type</th>
+              <th>Unit Price</th>
+              <th>Sold</th>
+              <th>Gross Sales</th>
+              <th>Missing</th>
+              <th>Loss</th>
+              <th>Net After Loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${financeRows || '<tr><td colspan="7" class="muted">No financial data for selected date.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
 
   buildQuickNav();
 }
@@ -970,6 +1037,40 @@ async function boot() {
             link.remove();
             URL.revokeObjectURL(url);
             showToast("CSV export downloaded");
+          })
+          .catch((error) => showToast(error.message));
+      }
+    };
+  }
+
+  if (el.exportFinancialCsvBtn) {
+    el.exportFinancialCsvBtn.onclick = () => {
+      const date = el.reportDate.value || new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams({ date });
+      const a = document.createElement("a");
+      a.href = `/api/admin/export-financial-csv?${params.toString()}`;
+      a.download = `bigcat-financial-report-${date}.csv`;
+
+      if (state.token) {
+        fetch(a.href, { headers: { Authorization: `Bearer ${state.token}` } })
+          .then((response) => {
+            if (!response.ok) {
+              return response.json().then((payload) => {
+                throw new Error(payload.error || "Financial export failed");
+              });
+            }
+            return response.blob();
+          })
+          .then((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = a.download;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            showToast("Financial report downloaded");
           })
           .catch((error) => showToast(error.message));
       }

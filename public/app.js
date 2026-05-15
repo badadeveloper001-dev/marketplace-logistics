@@ -2,6 +2,15 @@ const state = {
   token: localStorage.getItem("bakery_token") || "",
   user: null,
   breadTypes: {},
+  adminDensity: localStorage.getItem("bakery_admin_density") || "comfortable",
+  adminDataCache: {
+    submissions: {
+      baker: [],
+      bagger: [],
+      sales: [],
+      delivery: [],
+    },
+  },
   adminFilters: {
     baker: "all",
     bagger: "all",
@@ -9,6 +18,8 @@ const state = {
     delivery: "all",
   },
 };
+
+let adminViewportListenerAttached = false;
 
 const el = {
   loginView: document.getElementById("loginView"),
@@ -51,6 +62,7 @@ const el = {
   baggerSubmissionsTable: document.getElementById("baggerSubmissionsTable"),
   salesSubmissionsTable: document.getElementById("salesSubmissionsTable"),
   deliverySubmissionsTable: document.getElementById("deliverySubmissionsTable"),
+  adminDensityToggle: document.getElementById("adminDensityToggle"),
   batchHistoryCard: document.getElementById("batchHistoryCard"),
   batchHistory: document.getElementById("batchHistory"),
   historyFromDate: document.getElementById("historyFromDate"),
@@ -433,6 +445,173 @@ function renderRoleFilterButtons(role, rows) {
     .join("");
 }
 
+function adminRoleCardByRole(role) {
+  const map = {
+    baker: "bakerSubmissionsCard",
+    bagger: "baggerSubmissionsCard",
+    sales: "salesSubmissionsCard",
+    delivery: "deliverySubmissionsCard",
+  };
+  const cardId = map[role];
+  return cardId ? document.getElementById(cardId) : null;
+}
+
+function isAdminMobileViewport() {
+  return window.matchMedia("(max-width: 639px)").matches;
+}
+
+function shouldRenderAdminRole(role) {
+  const card = adminRoleCardByRole(role);
+  if (!card) return true;
+  if (!isAdminMobileViewport()) return true;
+  return !card.classList.contains("collapsed");
+}
+
+function applyAdminDensity() {
+  document.body.setAttribute("data-admin-density", state.adminDensity);
+  if (!el.adminDensityToggle) return;
+  el.adminDensityToggle.textContent = state.adminDensity === "compact" ? "Comfortable View" : "Compact View";
+}
+
+function initAdminDensityToggle() {
+  if (!el.adminDensityToggle) return;
+  applyAdminDensity();
+  el.adminDensityToggle.onclick = () => {
+    state.adminDensity = state.adminDensity === "compact" ? "comfortable" : "compact";
+    localStorage.setItem("bakery_admin_density", state.adminDensity);
+    applyAdminDensity();
+  };
+}
+
+function renderAdminRoleSections() {
+  const bakerRows = state.adminDataCache.submissions.baker || [];
+  const baggerRows = state.adminDataCache.submissions.bagger || [];
+  const salesRows = state.adminDataCache.submissions.sales || [];
+  const deliveryRows = state.adminDataCache.submissions.delivery || [];
+
+  const filteredBakerRows = applyAdminFilter(bakerRows, state.adminFilters.baker);
+  const filteredBaggerRows = applyAdminFilter(baggerRows, state.adminFilters.bagger);
+  const filteredSalesRows = applyAdminFilter(salesRows, state.adminFilters.sales);
+  const filteredDeliveryRows = applyAdminFilter(deliveryRows, state.adminFilters.delivery);
+
+  if (shouldRenderAdminRole("baker")) {
+    el.bakerSubmissionsTable.innerHTML = renderSubmissionCards(
+      filteredBakerRows,
+      [
+        { key: "bread_type", label: "Bread Type" },
+        { key: "flour_bags", label: "Flour Bags" },
+        { key: "produced_count", label: "Produced" },
+        { key: "difference", label: "Difference" },
+        { key: "severity", label: "Status", render: (v) => severityBadge(v) },
+        { key: "sugar", label: "Sugar" },
+        { key: "salt", label: "Salt" },
+        { key: "preservative", label: "Preservative" },
+        { key: "butter", label: "Butter" },
+        { key: "yeast", label: "Yeast" },
+        { key: "vegetable_oil", label: "Vegetable Oil" },
+        { key: "improver", label: "Improver" },
+      ],
+      "Baker"
+    );
+  }
+
+  if (shouldRenderAdminRole("bagger")) {
+    el.baggerSubmissionsTable.innerHTML = renderSubmissionCards(
+      filteredBaggerRows,
+      [
+        { key: "bread_type", label: "Bread Type" },
+        { key: "received_count", label: "Received" },
+        { key: "bagged_count", label: "Bagged" },
+        { key: "difference", label: "Difference" },
+        { key: "severity", label: "Status", render: (v) => severityBadge(v) },
+      ],
+      "Bagger"
+    );
+  }
+
+  if (shouldRenderAdminRole("sales")) {
+    el.salesSubmissionsTable.innerHTML = renderSubmissionCards(
+      filteredSalesRows,
+      [
+        { key: "bread_type", label: "Bread Type" },
+        { key: "paid_count", label: "Paid" },
+        { key: "credit_count", label: "Credit" },
+        { key: "total_sold", label: "Total Sold" },
+        { key: "difference", label: "Difference" },
+        { key: "severity", label: "Status", render: (v) => severityBadge(v) },
+      ],
+      "Sales"
+    );
+  }
+
+  if (shouldRenderAdminRole("delivery")) {
+    el.deliverySubmissionsTable.innerHTML = renderSubmissionCards(
+      filteredDeliveryRows,
+      [
+        { key: "bread_type", label: "Bread Type" },
+        { key: "taken_count", label: "Taken" },
+        { key: "paid_count", label: "Paid" },
+        { key: "credit_count", label: "Credit" },
+        { key: "total_delivered", label: "Total Delivered" },
+        { key: "difference", label: "Difference" },
+        { key: "severity", label: "Status", render: (v) => severityBadge(v) },
+      ],
+      "Delivery"
+    );
+  }
+}
+
+function initAdminAccordions() {
+  if (!el.adminPanel) return;
+  const cards = Array.from(el.adminPanel.querySelectorAll(".card[id][data-nav-label]"));
+  cards.forEach((card, index) => {
+    if (card.dataset.accordionReady === "1") return;
+
+    const label = card.dataset.navLabel || "Section";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "admin-card-toggle";
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.innerHTML = `<span>${label}</span><span class="admin-card-toggle-icon" aria-hidden="true">+</span>`;
+
+    const body = document.createElement("div");
+    body.className = "admin-card-body";
+
+    const existing = Array.from(card.childNodes);
+    existing.forEach((node) => body.appendChild(node));
+
+    card.appendChild(toggle);
+    card.appendChild(body);
+    card.classList.add("admin-card");
+
+    const defaultExpanded = index < 3;
+    if (!defaultExpanded) {
+      card.classList.add("collapsed");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+
+    toggle.onclick = () => {
+      const isCollapsed = card.classList.toggle("collapsed");
+      toggle.setAttribute("aria-expanded", String(!isCollapsed));
+      if (!isCollapsed) {
+        renderAdminRoleSections();
+      }
+    };
+
+    card.dataset.accordionReady = "1";
+  });
+
+  if (!adminViewportListenerAttached) {
+    const mobileMq = window.matchMedia("(max-width: 639px)");
+    mobileMq.addEventListener("change", () => {
+      if (state.user?.role === "admin") {
+        renderAdminRoleSections();
+      }
+    });
+    adminViewportListenerAttached = true;
+  }
+}
+
 function buildQuickNav() {
   const role = state.user?.role;
   if (role === "admin") {
@@ -654,6 +833,13 @@ async function refreshAdmin() {
   const filteredSalesRows = applyAdminFilter(salesRows, state.adminFilters.sales);
   const filteredDeliveryRows = applyAdminFilter(deliveryRows, state.adminFilters.delivery);
 
+  state.adminDataCache.submissions = {
+    baker: bakerRows,
+    bagger: baggerRows,
+    sales: salesRows,
+    delivery: deliveryRows,
+  };
+
   const allRows = [
     ...bakerRows.map((row) => ({ ...row, stage: "Baker" })),
     ...baggerRows.map((row) => ({ ...row, stage: "Bagger" })),
@@ -745,63 +931,8 @@ async function refreshAdmin() {
       : '<p class="muted" style="margin-top:0.7rem">No flagged discrepancies for selected date.</p>';
   }
 
-  el.bakerSubmissionsTable.innerHTML = renderSubmissionCards(
-    filteredBakerRows,
-    [
-      { key: "bread_type", label: "Bread Type" },
-      { key: "flour_bags", label: "Flour Bags" },
-      { key: "produced_count", label: "Produced" },
-      { key: "difference", label: "Difference" },
-      { key: "severity", label: "Status", render: (v) => severityBadge(v) },
-      { key: "sugar", label: "Sugar" },
-      { key: "salt", label: "Salt" },
-      { key: "preservative", label: "Preservative" },
-      { key: "butter", label: "Butter" },
-      { key: "yeast", label: "Yeast" },
-      { key: "vegetable_oil", label: "Vegetable Oil" },
-      { key: "improver", label: "Improver" },
-    ],
-    "Baker"
-  );
-
-  el.baggerSubmissionsTable.innerHTML = renderSubmissionCards(
-    filteredBaggerRows,
-    [
-      { key: "bread_type", label: "Bread Type" },
-      { key: "received_count", label: "Received" },
-      { key: "bagged_count", label: "Bagged" },
-      { key: "difference", label: "Difference" },
-      { key: "severity", label: "Status", render: (v) => severityBadge(v) },
-    ],
-    "Bagger"
-  );
-
-  el.salesSubmissionsTable.innerHTML = renderSubmissionCards(
-    filteredSalesRows,
-    [
-      { key: "bread_type", label: "Bread Type" },
-      { key: "paid_count", label: "Paid" },
-      { key: "credit_count", label: "Credit" },
-      { key: "total_sold", label: "Total Sold" },
-      { key: "difference", label: "Difference" },
-      { key: "severity", label: "Status", render: (v) => severityBadge(v) },
-    ],
-    "Sales"
-  );
-
-  el.deliverySubmissionsTable.innerHTML = renderSubmissionCards(
-    filteredDeliveryRows,
-    [
-      { key: "bread_type", label: "Bread Type" },
-      { key: "taken_count", label: "Taken" },
-      { key: "paid_count", label: "Paid" },
-      { key: "credit_count", label: "Credit" },
-      { key: "total_delivered", label: "Total Delivered" },
-      { key: "difference", label: "Difference" },
-      { key: "severity", label: "Status", render: (v) => severityBadge(v) },
-    ],
-    "Delivery"
-  );
+  // Keep summary stats refreshed first, and render heavy role sections on demand on mobile.
+  renderAdminRoleSections();
 
   if (el.financeSummary) {
     const rows = Array.isArray(finance.byBreadType) ? finance.byBreadType : [];
@@ -1190,6 +1321,8 @@ async function afterAuth() {
 
   if (state.user.role === "admin") {
     el.adminPanel.classList.remove("hidden");
+    initAdminDensityToggle();
+    initAdminAccordions();
     initCreateStaffForm();
     loadStaffList();
     try {

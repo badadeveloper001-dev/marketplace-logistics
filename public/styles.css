@@ -527,6 +527,27 @@ button.danger-btn:hover {
   padding: 0 0.65rem;
 }
 
+/* ─── Admin Card Accordion ──────────────────────────────────────── */
+.admin-card {
+  position: relative;
+}
+
+.admin-card-toggle {
+  display: none;
+}
+
+.admin-card-body {
+  display: grid;
+  gap: inherit;
+}
+
+.admin-card-toggle-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--accent-muted);
+}
+
 /* ─── Admin Count Grid ───────────────────────────────────────────── */
 .admin-counts {
   margin-top: 1rem;
@@ -951,6 +972,184 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 #adminPanel > .card { scroll-margin-top: 9rem; }
 
 /* ─── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  body[data-role="admin"] .app-shell {
+    padding: 0.9rem 0.8rem 2.5rem;
+    gap: 0.9rem;
+  }
+
+  body[data-role="admin"] .topbar {
+    top: 0.35rem;
+    padding: 0.75rem 0.85rem;
+    gap: 0.7rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  body[data-role="admin"] .topbar-left {
+    min-width: 0;
+    gap: 0.65rem;
+  }
+
+  body[data-role="admin"] .topbar-title {
+    font-size: 1rem;
+  }
+
+  body[data-role="admin"] .topbar-sub {
+    font-size: 0.83rem;
+  }
+
+  body[data-role="admin"] .topbar .ghost {
+    width: 100%;
+    height: 2.4rem;
+  }
+
+  body[data-role="admin"] #adminPanel {
+    gap: 0.95rem;
+  }
+
+  body[data-role="admin"] #adminPanel > .card {
+    padding: 1.1rem 1rem;
+    border-radius: var(--radius-lg);
+  }
+
+  body[data-role="admin"] #adminPanel > .card.admin-card {
+    padding: 0.8rem 0.8rem;
+  }
+
+  body[data-role="admin"] .admin-card-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 2.55rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border);
+    background: var(--surface-inset);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    box-shadow: none;
+    margin-bottom: 0.65rem;
+  }
+
+  body[data-role="admin"] .admin-card.collapsed .admin-card-body {
+    display: none;
+  }
+
+  body[data-role="admin"] .admin-card.collapsed .admin-card-toggle {
+    margin-bottom: 0;
+  }
+
+  body[data-role="admin"] .admin-card:not(.collapsed) .admin-card-toggle-icon {
+    transform: rotate(45deg);
+  }
+
+  body[data-role="admin"] #adminPanel h3 {
+    font-size: 1.16rem;
+  }
+
+  body[data-role="admin"] #adminPanel p,
+  body[data-role="admin"] #adminPanel .muted,
+  body[data-role="admin"] #adminPanel label,
+  body[data-role="admin"] #adminPanel input,
+  body[data-role="admin"] #adminPanel select,
+  body[data-role="admin"] #adminPanel button {
+    font-size: 0.9rem;
+  }
+
+  body[data-role="admin"] #adminPanel input,
+  body[data-role="admin"] #adminPanel select,
+  body[data-role="admin"] #adminPanel button {
+    height: 2.5rem;
+  }
+
+  body[data-role="admin"] #adminPanel .row-between,
+  body[data-role="admin"] #adminPanel .inline-date {
+    gap: 0.55rem;
+  }
+
+  body[data-role="admin"] #adminPanel .inline-date {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  body[data-role="admin"] #adminPanel .inline-date input[type="date"] {
+    width: 100%;
+    height: 2.5rem;
+  }
+
+  body[data-role="admin"] #adminPanel .row-between > button,
+  body[data-role="admin"] #adminPanel .row-between > .ghost {
+    width: 100%;
+  }
+
+  body[data-role="admin"] .admin-counts,
+  body[data-role="admin"] .admin-alert-summary {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-role="admin"] .admin-filter-bar {
+    margin-bottom: 0.7rem;
+    gap: 0.45rem;
+  }
+
+  body[data-role="admin"] .filter-pill {
+    height: 2.2rem;
+    padding: 0 0.8rem;
+    font-size: 0.84rem;
+  }
+
+  body[data-role="admin"] .submission-head {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  body[data-role="admin"] .submission-head time {
+    margin-top: 0;
+  }
+
+  body[data-role="admin"] .submission-grid {
+    grid-template-columns: 1fr;
+    gap: 0.48rem;
+  }
+
+  body[data-role="admin"] .top-discrepancy-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel > .card.admin-card {
+    padding: 0.68rem 0.7rem;
+  }
+
+  body[data-role="admin"][data-admin-density="compact"] .admin-card-toggle {
+    height: 2.32rem;
+    margin-bottom: 0.55rem;
+    font-size: 0.84rem;
+  }
+
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel h3 {
+    font-size: 1.03rem;
+  }
+
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel p,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel .muted,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel label,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel input,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel select,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel button {
+    font-size: 0.84rem;
+  }
+
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel input,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel select,
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel button {
+    height: 2.25rem;
+  }
+}
+
 @media (min-width: 640px) {
   .app-shell { padding: 1.5rem 1.5rem 3rem; }
 }

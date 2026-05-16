@@ -471,6 +471,7 @@ button.danger-btn:hover {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-full);
   box-shadow: none;
+  white-space: nowrap;
 }
 
 .quick-nav button:hover {
@@ -478,6 +479,12 @@ button.danger-btn:hover {
   color: var(--accent);
   border-color: var(--accent-muted);
   box-shadow: none;
+}
+
+.quick-nav button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* ─── App Layout ─────────────────────────────────────────────────── */
@@ -994,29 +1001,21 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
   gap: 1rem;
 }
 
-.admin-section.collapsed .admin-section-grid {
-  display: none;
+
+body[data-role="admin"] .quick-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
-.admin-section-toggle {
-  width: auto;
-  height: 2rem;
-  padding: 0 0.8rem;
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  color: var(--text-secondary);
-  border: 1.5px solid var(--border);
-  box-shadow: none;
-  font-size: 0.8rem;
-  font-weight: 700;
-  flex-shrink: 0;
+body[data-role="admin"] .quick-nav::-webkit-scrollbar {
+  height: 6px;
 }
 
-.admin-section-toggle:hover {
-  background: var(--surface-inset);
-  border-color: var(--border-strong);
-  color: var(--text);
-  box-shadow: none;
+body[data-role="admin"] .quick-nav::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.55);
+  border-radius: 999px;
 }
 
 .admin-grid-1 {
@@ -1095,8 +1094,13 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
     font-size: 1.1rem;
   }
 
-  body[data-role="admin"] #adminPanel .admin-section-toggle {
-    height: 2.1rem;
+  body[data-role="admin"] .quick-nav {
+    gap: 0.45rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  body[data-role="admin"] .quick-nav button {
+    height: 2.2rem;
     padding: 0 0.85rem;
     font-size: 0.82rem;
   }

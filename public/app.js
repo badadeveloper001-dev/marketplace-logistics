@@ -3,6 +3,7 @@ const state = {
   user: null,
   breadTypes: {},
   adminDensity: localStorage.getItem("bakery_admin_density") || "comfortable",
+  adminView: localStorage.getItem("bakery_admin_view") || "overview",
   adminDataCache: {
     submissions: {
       baker: [],
@@ -76,6 +77,8 @@ const el = {
   blameAnalysisBreadType: document.getElementById("blameAnalysisBreadType"),
   loadBlameAnalysisBtn: document.getElementById("loadBlameAnalysisBtn"),
   blameAnalysisResults: document.getElementById("blameAnalysisResults"),
+  operationsSection: document.getElementById("operationsSection"),
+  submissionsSection: document.getElementById("submissionsSection"),
 };
 
 function showToast(message) {
@@ -671,11 +674,63 @@ function initAdminAccordions() {
   }
 }
 
+function setAdminDashboardView(view, persist = true) {
+  const views = {
+    overview: ["adminControlsCard"],
+    staff: ["staffManagementCard"],
+    finance: ["financeCard"],
+    rootcause: ["blameAnalysisCard"],
+    submissions: ["bakerSubmissionsCard", "baggerSubmissionsCard", "salesSubmissionsCard", "deliverySubmissionsCard"],
+    all: [
+      "staffManagementCard",
+      "financeCard",
+      "adminControlsCard",
+      "blameAnalysisCard",
+      "bakerSubmissionsCard",
+      "baggerSubmissionsCard",
+      "salesSubmissionsCard",
+      "deliverySubmissionsCard",
+    ],
+  };
+
+  const selected = views[view] ? view : "overview";
+  state.adminView = selected;
+  if (persist) localStorage.setItem("bakery_admin_view", selected);
+
+  const allCards = Array.from(el.adminPanel.querySelectorAll(".card[id][data-nav-label]"));
+  const visible = new Set(views[selected]);
+
+  allCards.forEach((card) => {
+    const show = visible.has(card.id);
+    card.classList.toggle("hidden", !show);
+  });
+
+  [el.operationsSection, el.submissionsSection].forEach((section) => {
+    if (!section) return;
+    const hasVisibleCards = Array.from(section.querySelectorAll(".card[id][data-nav-label]")).some(
+      (card) => !card.classList.contains("hidden")
+    );
+    section.classList.toggle("hidden", !hasVisibleCards);
+  });
+
+  el.quickNav.querySelectorAll("button[data-admin-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminView === selected);
+  });
+}
+
 function buildQuickNav() {
   const role = state.user?.role;
   if (role === "admin") {
-    el.quickNav.innerHTML = "";
-    el.quickNav.classList.add("hidden");
+    el.quickNav.innerHTML = `
+      <button type="button" data-admin-view="overview">Dashboard</button>
+      <button type="button" data-admin-view="submissions">Submissions</button>
+      <button type="button" data-admin-view="staff">Staff Management</button>
+      <button type="button" data-admin-view="rootcause">Root Cause Analysis</button>
+      <button type="button" data-admin-view="finance">Finance</button>
+      <button type="button" data-admin-view="all">Show All</button>
+    `;
+    el.quickNav.classList.remove("hidden");
+    setAdminDashboardView(state.adminView, false);
     return;
   }
 
@@ -1284,6 +1339,14 @@ async function boot() {
   };
 
   el.quickNav.onclick = (event) => {
+    if (state.user?.role === "admin") {
+      const menuButton = event.target.closest("button[data-admin-view]");
+      if (!menuButton) return;
+      setAdminDashboardView(menuButton.dataset.adminView);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     const button = event.target.closest("button[data-target]");
     if (!button) return;
 
@@ -1381,7 +1444,6 @@ async function afterAuth() {
   if (state.user.role === "admin") {
     el.adminPanel.classList.remove("hidden");
     initAdminDensityToggle();
-    initAdminSectionToggles();
     initAdminAccordions();
     initCreateStaffForm();
     loadStaffList();

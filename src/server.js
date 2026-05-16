@@ -110,6 +110,12 @@ function createStaffUsernameFromPhone(normalizedPhone) {
   return `staff_${normalizedPhone}`;
 }
 
+function normalizePhoneInput(phone) {
+  return String(phone || "")
+    .replace(/[\s\-\+\(\)]/g, "")
+    .replace(/^234/, "0");
+}
+
 function createUserSafe(row) {
   return {
     id: row.id,
@@ -234,28 +240,73 @@ app.post("/api/auth/admin-login", (req, res) => {
     return res.status(401).json({ error: "Invalid access code" });
   }
 
-  const admin = db.prepare("SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1").get();
-  if (!admin) return res.status(500).json({ error: "Admin account not configured" });
+  const loadAdmin = async () => {
+    if (pgPool) {
+      try {
+        const result = await pgPool.query(
+          "SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1"
+        );
+        if (result.rows[0]) return result.rows[0];
+      } catch (error) {
+        console.error("PG admin lookup failed:", error.message);
+        if (IS_VERCEL) {
+          throw error;
+        }
+      }
+    }
 
-  const token = jwt.sign(
-    { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone, role: admin.role },
-    JWT_SECRET,
-    { expiresIn: "12h" }
-  );
+    return db.prepare("SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1").get();
+  };
 
-  res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+  return Promise.resolve(loadAdmin())
+    .then((admin) => {
+      if (!admin) return res.status(500).json({ error: "Admin account not configured" });
+
+      const token = jwt.sign(
+        { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone, role: admin.role },
+        JWT_SECRET,
+        { expiresIn: "12h" }
+      );
+
+      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+    })
+    .catch(() => {
+      if (!res.headersSent) {
+        return res.status(500).json({ error: "Admin account not configured" });
+      }
+    });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const phone = String(req.body.phone || "").trim();
+  const normalizedPhone = normalizePhoneInput(phone);
   const password = String(req.body.password || "");
   if (!phone || !password) {
     return badRequest(res, "Phone number and password are required");
   }
 
-  const user = db
-    .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = ?")
-    .get(phone);
+  let user = null;
+
+  if (pgPool) {
+    try {
+      const result = await pgPool.query(
+        "SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = $1 LIMIT 1",
+        [normalizedPhone]
+      );
+      user = result.rows[0] || null;
+    } catch (error) {
+      console.error("PG login lookup failed:", error.message);
+      if (IS_VERCEL) {
+        return res.status(500).json({ error: "Failed to load login record. Please try again." });
+      }
+    }
+  }
+
+  if (!user) {
+    user = db
+      .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = ?")
+      .get(normalizedPhone);
+  }
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: "Invalid credentials" });
@@ -751,7 +802,7 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, re
     return badRequest(res, "Invalid phone number");
   }
 
-  const normalizedPhone = phone.replace(/[\s\-\+\(\)]/g, "").replace(/^234/, "0");
+  const normalizedPhone = normalizePhoneInput(phone);
 
   const existingPhone = db.prepare("SELECT id FROM users WHERE phone = ?").get(normalizedPhone);
   if (existingPhone) {

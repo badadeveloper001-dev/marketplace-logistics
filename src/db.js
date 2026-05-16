@@ -71,9 +71,24 @@ const CRITICAL_THRESHOLD = 10;
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 
+function buildPgConfig(url) {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port, 10) || 5432,
+      database: parsed.pathname.replace(/^\//, "") || "postgres",
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+    };
+  } catch (_e) {
+    return { connectionString: url };
+  }
+}
+
 const pgPool = USE_POSTGRES
   ? new Pool({
-      connectionString: POSTGRES_URL,
+      ...buildPgConfig(POSTGRES_URL),
       ssl: { rejectUnauthorized: false },
       family: Number(process.env.PG_FAMILY || 4),
       connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 8000),

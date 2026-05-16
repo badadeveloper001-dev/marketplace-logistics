@@ -126,6 +126,55 @@ function createUserSafe(row) {
   };
 }
 
+async function loadAdminUser() {
+  const lookups = [];
+
+  if (pgPool) {
+    lookups.push(
+      pgPool
+        .query("SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1")
+        .then((result) => result.rows[0] || null)
+    );
+  }
+
+  lookups.push(
+    Promise.resolve(
+      db.prepare("SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1").get()
+    )
+  );
+
+  const results = await Promise.allSettled(lookups);
+  const admin = results.find((result) => result.status === "fulfilled" && result.value);
+  return admin ? admin.value : null;
+}
+
+async function loadStaffUserByPhone(normalizedPhone) {
+  const lookups = [];
+
+  if (pgPool) {
+    lookups.push(
+      pgPool
+        .query(
+          "SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = $1 LIMIT 1",
+          [normalizedPhone]
+        )
+        .then((result) => result.rows[0] || null)
+    );
+  }
+
+  lookups.push(
+    Promise.resolve(
+      db
+        .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = ?")
+        .get(normalizedPhone)
+    )
+  );
+
+  const results = await Promise.allSettled(lookups);
+  const user = results.find((result) => result.status === "fulfilled" && result.value);
+  return user ? user.value : null;
+}
+
 function toCsvCell(value) {
   if (value === null || value === undefined) return "";
   const text = String(value);
@@ -240,25 +289,7 @@ app.post("/api/auth/admin-login", (req, res) => {
     return res.status(401).json({ error: "Invalid access code" });
   }
 
-  const loadAdmin = async () => {
-    if (pgPool) {
-      try {
-        const result = await pgPool.query(
-          "SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1"
-        );
-        if (result.rows[0]) return result.rows[0];
-      } catch (error) {
-        console.error("PG admin lookup failed:", error.message);
-        if (IS_VERCEL) {
-          throw error;
-        }
-      }
-    }
-
-    return db.prepare("SELECT id, name, email, phone, role FROM users WHERE role = 'admin' LIMIT 1").get();
-  };
-
-  return Promise.resolve(loadAdmin())
+  return loadAdminUser()
     .then((admin) => {
       if (!admin) return res.status(500).json({ error: "Admin account not configured" });
 
@@ -268,12 +299,11 @@ app.post("/api/auth/admin-login", (req, res) => {
         { expiresIn: "12h" }
       );
 
-      res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
+      return res.json({ token, user: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } });
     })
-    .catch(() => {
-      if (!res.headersSent) {
-        return res.status(500).json({ error: "Admin account not configured" });
-      }
+    .catch((error) => {
+      console.error("Admin login lookup failed:", error.message);
+      return res.status(500).json({ error: "Admin account not configured" });
     });
 });
 
@@ -287,25 +317,13 @@ app.post("/api/auth/login", async (req, res) => {
 
   let user = null;
 
-  if (pgPool) {
-    try {
-      const result = await pgPool.query(
-        "SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = $1 LIMIT 1",
-        [normalizedPhone]
-      );
-      user = result.rows[0] || null;
-    } catch (error) {
-      console.error("PG login lookup failed:", error.message);
-      if (IS_VERCEL) {
-        return res.status(500).json({ error: "Failed to load login record. Please try again." });
-      }
+  try {
+    user = await loadStaffUserByPhone(normalizedPhone);
+  } catch (error) {
+    console.error("Login lookup failed:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to load login record. Please try again." });
     }
-  }
-
-  if (!user) {
-    user = db
-      .prepare("SELECT id, name, email, phone, username, role, password_hash FROM users WHERE phone = ?")
-      .get(normalizedPhone);
   }
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {

@@ -20,6 +20,7 @@ const state = {
 };
 
 let adminViewportListenerAttached = false;
+let adminSectionViewportListenerAttached = false;
 
 const el = {
   loginView: document.getElementById("loginView"),
@@ -463,8 +464,66 @@ function isAdminMobileViewport() {
 function shouldRenderAdminRole(role) {
   const card = adminRoleCardByRole(role);
   if (!card) return true;
+  const parentSection = card.closest(".admin-section");
+  if (parentSection && parentSection.classList.contains("collapsed")) return false;
   if (!isAdminMobileViewport()) return true;
   return !card.classList.contains("collapsed");
+}
+
+function isAdminSectionMobileViewport() {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function setAdminSectionExpanded(section, expanded) {
+  section.classList.toggle("collapsed", !expanded);
+  const toggle = section.querySelector(".admin-section-toggle");
+  if (!toggle) return;
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.textContent = expanded ? "Collapse" : "Expand";
+}
+
+function initAdminSectionToggles() {
+  if (!el.adminPanel) return;
+  const sections = Array.from(el.adminPanel.querySelectorAll(".admin-section[id]"));
+  if (!sections.length) return;
+
+  sections.forEach((section, index) => {
+    const toggle = section.querySelector(".admin-section-toggle");
+    if (!toggle) return;
+    if (toggle.dataset.ready === "1") return;
+
+    toggle.onclick = () => {
+      const mobile = isAdminSectionMobileViewport();
+      const expanding = section.classList.contains("collapsed");
+
+      if (mobile && expanding) {
+        sections.forEach((other) => {
+          if (other !== section) setAdminSectionExpanded(other, false);
+        });
+      }
+
+      setAdminSectionExpanded(section, !section.classList.contains("collapsed"));
+      renderAdminRoleSections();
+    };
+
+    toggle.dataset.ready = "1";
+
+    const openByDefault = isAdminSectionMobileViewport() ? index === 0 : true;
+    setAdminSectionExpanded(section, openByDefault);
+  });
+
+  if (!adminSectionViewportListenerAttached) {
+    const mq = window.matchMedia("(max-width: 767px)");
+    mq.addEventListener("change", () => {
+      if (state.user?.role !== "admin") return;
+      sections.forEach((section, index) => {
+        const openByDefault = mq.matches ? index === 0 : true;
+        setAdminSectionExpanded(section, openByDefault);
+      });
+      renderAdminRoleSections();
+    });
+    adminSectionViewportListenerAttached = true;
+  }
 }
 
 function applyAdminDensity() {
@@ -1322,6 +1381,7 @@ async function afterAuth() {
   if (state.user.role === "admin") {
     el.adminPanel.classList.remove("hidden");
     initAdminDensityToggle();
+    initAdminSectionToggles();
     initAdminAccordions();
     initCreateStaffForm();
     loadStaffList();

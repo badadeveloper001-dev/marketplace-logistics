@@ -974,9 +974,15 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 }
 
 .admin-section-head {
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.15rem 0.1rem 0.35rem;
+}
+
+.admin-section-head > div {
+  min-width: 0;
 }
 
 .admin-section-head h2 {
@@ -986,6 +992,31 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 .admin-section-grid {
   display: grid;
   gap: 1rem;
+}
+
+.admin-section.collapsed .admin-section-grid {
+  display: none;
+}
+
+.admin-section-toggle {
+  width: auto;
+  height: 2rem;
+  padding: 0 0.8rem;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  box-shadow: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.admin-section-toggle:hover {
+  background: var(--surface-inset);
+  border-color: var(--border-strong);
+  color: var(--text);
+  box-shadow: none;
 }
 
 .admin-grid-1 {
@@ -1062,6 +1093,12 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 
   body[data-role="admin"] #adminPanel .admin-section-head h2 {
     font-size: 1.1rem;
+  }
+
+  body[data-role="admin"] #adminPanel .admin-section-toggle {
+    height: 2.1rem;
+    padding: 0 0.85rem;
+    font-size: 0.82rem;
   }
 
   body[data-role="admin"] #adminPanel .admin-section .card {

@@ -819,11 +819,25 @@ app.post("/api/admin/staff", authRequired, roleRequired("admin"), async (req, re
   res.status(201).json({ user: created });
 });
 
-app.get("/api/admin/staff", authRequired, roleRequired("admin"), (req, res) => {
+app.get("/api/admin/staff", authRequired, roleRequired("admin"), async (req, res) => {
+  if (pgPool) {
+    try {
+      const result = await pgPool.query(
+        "SELECT id, name, email, phone, role, created_at FROM users WHERE role <> 'admin' ORDER BY role, name"
+      );
+      return res.json({ staff: result.rows });
+    } catch (error) {
+      console.error("PG read failed during staff listing:", error.message);
+      if (IS_VERCEL) {
+        return res.status(500).json({ error: "Failed to load staff list. Please try again." });
+      }
+    }
+  }
+
   const staff = db
     .prepare("SELECT id, name, email, phone, role, created_at FROM users WHERE role != 'admin' ORDER BY role, name")
     .all();
-  res.json({ staff });
+  return res.json({ staff });
 });
 
 app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (req, res) => {

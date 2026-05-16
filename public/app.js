@@ -866,7 +866,7 @@ async function loadStaffList() {
         try {
           await api(`/api/admin/staff/${btn.dataset.id}`, { method: "DELETE" });
           showToast("Staff removed");
-          loadStaffList();
+          await loadStaffList();
         } catch (err) {
           showToast(err.message);
         }
@@ -893,7 +893,7 @@ function initCreateStaffForm() {
       await api("/api/admin/staff", { method: "POST", body: JSON.stringify(body) });
       showToast(`Staff account created for ${body.name}`);
       form.reset();
-      loadStaffList();
+      await loadStaffList();
     } catch (err) {
       showToast(err.message);
     } finally {

@@ -90,7 +90,7 @@ const pgPool = USE_POSTGRES
   ? new Pool({
       ...buildPgConfig(POSTGRES_URL),
       ssl: { rejectUnauthorized: false },
-      family: Number(process.env.PG_FAMILY || 4),
+  family: Number.isFinite(Number(process.env.PG_FAMILY)) ? Number(process.env.PG_FAMILY) : 4,
       connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 8000),
       idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 10000),
       max: Number(process.env.PG_POOL_MAX || 10),

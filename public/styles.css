@@ -458,6 +458,13 @@ button.danger-btn:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition), background var(--transition), border-color var(--transition);
+}
+
+.quick-nav.scrolled {
+  background: rgba(255,255,255,0.96);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .quick-nav button {

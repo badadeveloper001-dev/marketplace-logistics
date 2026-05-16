@@ -22,6 +22,7 @@ const state = {
 
 let adminViewportListenerAttached = false;
 let adminSectionViewportListenerAttached = false;
+let adminQuickNavScrollListenerAttached = false;
 
 const el = {
   loginView: document.getElementById("loginView"),
@@ -529,6 +530,23 @@ function initAdminSectionToggles() {
   }
 }
 
+function initAdminQuickNavEffects() {
+  if (adminQuickNavScrollListenerAttached) return;
+  const onScroll = () => {
+    if (!el.quickNav) return;
+    const isAdmin = state.user?.role === "admin";
+    if (!isAdmin) {
+      el.quickNav.classList.remove("scrolled");
+      return;
+    }
+    el.quickNav.classList.toggle("scrolled", window.scrollY > 24);
+  };
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  adminQuickNavScrollListenerAttached = true;
+}
+
 function applyAdminDensity() {
   document.body.setAttribute("data-admin-density", state.adminDensity);
   if (!el.adminDensityToggle) return;
@@ -681,16 +699,6 @@ function setAdminDashboardView(view, persist = true) {
     finance: ["financeCard"],
     rootcause: ["blameAnalysisCard"],
     submissions: ["bakerSubmissionsCard", "baggerSubmissionsCard", "salesSubmissionsCard", "deliverySubmissionsCard"],
-    all: [
-      "staffManagementCard",
-      "financeCard",
-      "adminControlsCard",
-      "blameAnalysisCard",
-      "bakerSubmissionsCard",
-      "baggerSubmissionsCard",
-      "salesSubmissionsCard",
-      "deliverySubmissionsCard",
-    ],
   };
 
   const selected = views[view] ? view : "overview";
@@ -727,7 +735,6 @@ function buildQuickNav() {
       <button type="button" data-admin-view="staff">Staff Management</button>
       <button type="button" data-admin-view="rootcause">Root Cause Analysis</button>
       <button type="button" data-admin-view="finance">Finance</button>
-      <button type="button" data-admin-view="all">Show All</button>
     `;
     el.quickNav.classList.remove("hidden");
     setAdminDashboardView(state.adminView, false);
@@ -1444,6 +1451,7 @@ async function afterAuth() {
   if (state.user.role === "admin") {
     el.adminPanel.classList.remove("hidden");
     initAdminDensityToggle();
+    initAdminQuickNavEffects();
     initAdminAccordions();
     initCreateStaffForm();
     loadStaffList();

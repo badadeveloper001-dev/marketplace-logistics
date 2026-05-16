@@ -150,97 +150,115 @@
         </section>
 
         <section id="adminPanel" class="hidden">
-          <article id="staffManagementCard" class="card" data-nav-label="Staff">
-            <h3>Staff Management</h3>
-            <p class="muted">Create staff accounts. Staff sign in with their phone number — default password is the last 4 digits of their number.</p>
-            <form id="createStaffForm" class="form-grid" style="margin-bottom:1.5rem">
-              <label>Full Name<input name="name" required placeholder="e.g. Jane Doe" /></label>
-              <label>Phone Number<input type="tel" name="phone" required placeholder="e.g. 08012345678" /></label>
-              <label>Role
-                <select name="role" required>
-                  <option value="">Select role…</option>
-                  <option value="baker">Baker</option>
-                  <option value="bagger">Bagger</option>
-                  <option value="sales">Sales</option>
-                  <option value="delivery">Delivery</option>
-                </select>
-              </label>
-              <button type="submit">Create Staff Account</button>
-            </form>
-            <h4 style="margin-bottom:0.5rem">Current Staff</h4>
-            <div id="staffList"></div>
-          </article>
+          <section class="admin-section" id="operationsSection">
+            <header class="admin-section-head">
+              <h2>Operations Center</h2>
+              <p class="muted">Manage staff, monitor totals, and run operational checks from one section.</p>
+            </header>
 
-          <article id="adminControlsCard" class="card" data-nav-label="Controls">
-            <div class="row-between">
-              <h3>Admin Dashboard</h3>
-              <label class="inline-date">
-                Date
-                <input id="reportDate" type="date" />
-              </label>
+            <div class="admin-section-grid admin-grid-2">
+              <article id="staffManagementCard" class="card" data-nav-label="Staff">
+                <h3>Staff Management</h3>
+                <p class="muted">Create staff accounts. Staff sign in with their phone number — default password is the last 4 digits of their number.</p>
+                <form id="createStaffForm" class="form-grid" style="margin-bottom:1.5rem">
+                  <label>Full Name<input name="name" required placeholder="e.g. Jane Doe" /></label>
+                  <label>Phone Number<input type="tel" name="phone" required placeholder="e.g. 08012345678" /></label>
+                  <label>Role
+                    <select name="role" required>
+                      <option value="">Select role…</option>
+                      <option value="baker">Baker</option>
+                      <option value="bagger">Bagger</option>
+                      <option value="sales">Sales</option>
+                      <option value="delivery">Delivery</option>
+                    </select>
+                  </label>
+                  <button type="submit">Create Staff Account</button>
+                </form>
+                <h4 style="margin-bottom:0.5rem">Current Staff</h4>
+                <div id="staffList"></div>
+              </article>
+
+              <article id="financeCard" class="card" data-nav-label="Finance">
+                <h3>Financial Monitoring</h3>
+                <p class="muted">Automatic financial summary using loaf prices: Jumbo 2000, Eco 1300, Mini 500.</p>
+                <div id="financeSummary" class="finance-summary" style="margin-top:0.75rem"></div>
+              </article>
+
+              <article id="adminControlsCard" class="card section-span" data-nav-label="Controls">
+                <div class="row-between">
+                  <h3>Admin Dashboard</h3>
+                  <label class="inline-date">
+                    Date
+                    <input id="reportDate" type="date" />
+                  </label>
+                </div>
+                <p class="muted">Automatic timestamping is used for all submissions. Staff do not enter date/time.</p>
+                <div class="row-between" style="gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
+                  <button id="refreshAdminBtn">Refresh Submissions</button>
+                  <button id="exportCsvBtn" type="button" class="ghost">Export CSV</button>
+                  <button id="exportFinancialCsvBtn" type="button" class="ghost">Download Financial Report</button>
+                  <button id="adminDensityToggle" type="button" class="ghost">Compact View</button>
+                </div>
+                <div id="adminCounts" class="admin-counts"></div>
+                <div id="alertSummary" class="admin-alert-summary"></div>
+                <div id="topDiscrepancies" class="top-discrepancies"></div>
+              </article>
+
+              <article id="blameAnalysisCard" class="card section-span" data-nav-label="Blame Analysis">
+                <div class="row-between">
+                  <h3>Root Cause Analysis</h3>
+                  <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
+                    <label class="inline-date">
+                      Date
+                      <input id="blameAnalysisDate" type="date" />
+                    </label>
+                    <label class="inline-date">
+                      Bread Type
+                      <select id="blameAnalysisBreadType" style="min-width:130px;">
+                        <option value="">All Types</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <p class="muted">Identify which stage is responsible for bread loss in the supply chain.</p>
+                <button id="loadBlameAnalysisBtn" style="margin-top:0.5rem">Analyze Discrepancies</button>
+                <div id="blameAnalysisResults" style="margin-top:1rem"></div>
+              </article>
             </div>
-            <p class="muted">Automatic timestamping is used for all submissions. Staff do not enter date/time.</p>
-            <div class="row-between" style="gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
-              <button id="refreshAdminBtn">Refresh Submissions</button>
-              <button id="exportCsvBtn" type="button" class="ghost">Export CSV</button>
-              <button id="exportFinancialCsvBtn" type="button" class="ghost">Download Financial Report</button>
-              <button id="adminDensityToggle" type="button" class="ghost">Compact View</button>
+          </section>
+
+          <section class="admin-section" id="submissionsSection">
+            <header class="admin-section-head">
+              <h2>Submission Lanes</h2>
+              <p class="muted">Review each stage separately so issues are easier to track and resolve.</p>
+            </header>
+
+            <div class="admin-section-grid admin-grid-1">
+              <article id="bakerSubmissionsCard" class="card" data-nav-label="Baker Submissions">
+                <h3><span class="role-tag baker">🧑‍🍳 Baker</span> Submissions</h3>
+                <div id="bakerFilters" class="admin-filter-bar"></div>
+                <div id="bakerSubmissionsTable" class="scroll-table"></div>
+              </article>
+
+              <article id="baggerSubmissionsCard" class="card" data-nav-label="Bagger Submissions">
+                <h3><span class="role-tag bagger">📦 Bagger</span> Submissions</h3>
+                <div id="baggerFilters" class="admin-filter-bar"></div>
+                <div id="baggerSubmissionsTable" class="scroll-table"></div>
+              </article>
+
+              <article id="salesSubmissionsCard" class="card" data-nav-label="Sales Submissions">
+                <h3><span class="role-tag sales">🏪 Sales</span> Submissions</h3>
+                <div id="salesFilters" class="admin-filter-bar"></div>
+                <div id="salesSubmissionsTable" class="scroll-table"></div>
+              </article>
+
+              <article id="deliverySubmissionsCard" class="card" data-nav-label="Delivery Submissions">
+                <h3><span class="role-tag delivery">🚚 Delivery</span> Submissions</h3>
+                <div id="deliveryFilters" class="admin-filter-bar"></div>
+                <div id="deliverySubmissionsTable" class="scroll-table"></div>
+              </article>
             </div>
-            <div id="adminCounts" class="admin-counts"></div>
-            <div id="alertSummary" class="admin-alert-summary"></div>
-            <div id="topDiscrepancies" class="top-discrepancies"></div>
-          </article>
-
-          <article id="financeCard" class="card" data-nav-label="Finance">
-            <h3>Financial Monitoring</h3>
-            <p class="muted">Automatic financial summary using loaf prices: Jumbo 2000, Eco 1300, Mini 500.</p>
-            <div id="financeSummary" class="finance-summary" style="margin-top:0.75rem"></div>
-          </article>
-
-          <article id="blameAnalysisCard" class="card" data-nav-label="Blame Analysis">
-            <div class="row-between">
-              <h3>Root Cause Analysis</h3>
-              <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
-                <label class="inline-date">
-                  Date
-                  <input id="blameAnalysisDate" type="date" />
-                </label>
-                <label class="inline-date">
-                  Bread Type
-                  <select id="blameAnalysisBreadType" style="min-width:130px;">
-                    <option value="">All Types</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-            <p class="muted">Identify which stage is responsible for bread loss in the supply chain.</p>
-            <button id="loadBlameAnalysisBtn" style="margin-top:0.5rem">Analyze Discrepancies</button>
-            <div id="blameAnalysisResults" style="margin-top:1rem"></div>
-          </article>
-
-          <article id="bakerSubmissionsCard" class="card" data-nav-label="Baker Submissions">
-            <h3><span class="role-tag baker">🧑‍🍳 Baker</span> Submissions</h3>
-            <div id="bakerFilters" class="admin-filter-bar"></div>
-            <div id="bakerSubmissionsTable" class="scroll-table"></div>
-          </article>
-
-          <article id="baggerSubmissionsCard" class="card" data-nav-label="Bagger Submissions">
-            <h3><span class="role-tag bagger">📦 Bagger</span> Submissions</h3>
-            <div id="baggerFilters" class="admin-filter-bar"></div>
-            <div id="baggerSubmissionsTable" class="scroll-table"></div>
-          </article>
-
-          <article id="salesSubmissionsCard" class="card" data-nav-label="Sales Submissions">
-            <h3><span class="role-tag sales">🏪 Sales</span> Submissions</h3>
-            <div id="salesFilters" class="admin-filter-bar"></div>
-            <div id="salesSubmissionsTable" class="scroll-table"></div>
-          </article>
-
-          <article id="deliverySubmissionsCard" class="card" data-nav-label="Delivery Submissions">
-            <h3><span class="role-tag delivery">🚚 Delivery</span> Submissions</h3>
-            <div id="deliveryFilters" class="admin-filter-bar"></div>
-            <div id="deliverySubmissionsTable" class="scroll-table"></div>
-          </article>
+          </section>
         </section>
       </section>
 

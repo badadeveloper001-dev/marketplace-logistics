@@ -956,7 +956,49 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 }
 
 /* ─── Grid layouts ───────────────────────────────────────────────── */
-#staffPanel, #adminPanel { display: grid; gap: 1.5rem; }
+#staffPanel { display: grid; gap: 1.5rem; }
+
+#adminPanel {
+  display: grid;
+  gap: 1.75rem;
+}
+
+.admin-section {
+  display: grid;
+  gap: 0.95rem;
+  padding: 1rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.74);
+  box-shadow: var(--shadow-xs);
+}
+
+.admin-section-head {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.15rem 0.1rem 0.35rem;
+}
+
+.admin-section-head h2 {
+  font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+}
+
+.admin-section-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-grid-1 {
+  grid-template-columns: 1fr;
+}
+
+.admin-grid-2 {
+  grid-template-columns: 1fr;
+}
+
+.admin-section .section-span {
+  grid-column: 1 / -1;
+}
 
 /* ─── Animations ─────────────────────────────────────────────────── */
 @keyframes rise {
@@ -968,8 +1010,8 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 .hidden { display: none !important; }
 
 /* ─── Scroll margin ──────────────────────────────────────────────── */
-#staffPanel > .card,
-#adminPanel > .card { scroll-margin-top: 10rem; }
+#staffPanel .card,
+#adminPanel .card { scroll-margin-top: 10rem; }
 
 /* ─── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 639px) {
@@ -1005,15 +1047,29 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
   }
 
   body[data-role="admin"] #adminPanel {
-    gap: 0.95rem;
+    gap: 1rem;
   }
 
-  body[data-role="admin"] #adminPanel > .card {
+  body[data-role="admin"] #adminPanel .admin-section {
+    padding: 0.7rem;
+    gap: 0.7rem;
+    border-radius: var(--radius-lg);
+  }
+
+  body[data-role="admin"] #adminPanel .admin-section-head {
+    padding: 0.1rem 0.2rem 0.25rem;
+  }
+
+  body[data-role="admin"] #adminPanel .admin-section-head h2 {
+    font-size: 1.1rem;
+  }
+
+  body[data-role="admin"] #adminPanel .admin-section .card {
     padding: 1.1rem 1rem;
     border-radius: var(--radius-lg);
   }
 
-  body[data-role="admin"] #adminPanel > .card.admin-card {
+  body[data-role="admin"] #adminPanel .admin-section .card.admin-card {
     padding: 0.8rem 0.8rem;
   }
 
@@ -1120,7 +1176,7 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
     gap: 0.45rem;
   }
 
-  body[data-role="admin"][data-admin-density="compact"] #adminPanel > .card.admin-card {
+  body[data-role="admin"][data-admin-density="compact"] #adminPanel .admin-section .card.admin-card {
     padding: 0.68rem 0.7rem;
   }
 
@@ -1176,23 +1232,32 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
   }
   #staffPanel > .card:last-child { grid-column: 1 / -1; }
 
-  #adminPanel { grid-template-columns: repeat(2, 1fr); }
-  #adminPanel > #adminControlsCard,
-  #adminPanel > #blameAnalysisCard,
-  #adminPanel > #bakerSubmissionsCard,
-  #adminPanel > #baggerSubmissionsCard,
-  #adminPanel > #salesSubmissionsCard,
-  #adminPanel > #deliverySubmissionsCard { grid-column: 1 / -1; }
+  .admin-section {
+    padding: 1.15rem;
+  }
+
+  #adminPanel .admin-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.1rem;
+  }
+
+  #adminPanel .admin-grid-1 {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (min-width: 1024px) {
   .app-shell { padding: 1.75rem 2rem 4rem; }
 
-  #adminPanel { grid-template-columns: repeat(2, 1fr); }
-  #adminPanel > #adminControlsCard,
-  #adminPanel > #blameAnalysisCard,
-  #adminPanel > #bakerSubmissionsCard,
-  #adminPanel > #baggerSubmissionsCard,
-  #adminPanel > #salesSubmissionsCard,
-  #adminPanel > #deliverySubmissionsCard { grid-column: 1 / -1; }
+  .admin-section {
+    padding: 1.25rem;
+  }
+
+  .admin-section-head {
+    grid-template-columns: 1fr;
+  }
+
+  #adminPanel .admin-grid-2 {
+    gap: 1.25rem;
+  }
 }

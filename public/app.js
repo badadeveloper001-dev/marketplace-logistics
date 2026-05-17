@@ -50,7 +50,10 @@ const el = {
   createStaffForm: document.getElementById("createStaffForm"),
   staffList: document.getElementById("staffList"),
   refreshAdminBtn: document.getElementById("refreshAdminBtn"),
-  exportCsvBtn: document.getElementById("exportCsvBtn"),
+  exportOptionsToggle: document.getElementById("exportOptionsToggle"),
+  exportOptionsPanel: document.getElementById("exportOptionsPanel"),
+  executeExportBtn: document.getElementById("executeExportBtn"),
+  closeExportPanelBtn: document.getElementById("closeExportPanelBtn"),
   exportFinancialCsvBtn: document.getElementById("exportFinancialCsvBtn"),
   reportDate: document.getElementById("reportDate"),
   adminCounts: document.getElementById("adminCounts"),
@@ -80,6 +83,12 @@ const el = {
   blameAnalysisResults: document.getElementById("blameAnalysisResults"),
   operationsSection: document.getElementById("operationsSection"),
   submissionsSection: document.getElementById("submissionsSection"),
+  adjustmentsCard: document.getElementById("adjustmentsCard"),
+  adjustmentsList: document.getElementById("adjustmentsList"),
+  bakerSearchName: document.getElementById("bakerSearchName"),
+  baggerSearchName: document.getElementById("baggerSearchName"),
+  salesSearchName: document.getElementById("salesSearchName"),
+  deliverySearchName: document.getElementById("deliverySearchName"),
 };
 
 function showToast(message) {
@@ -575,7 +584,10 @@ function renderAdminRoleSections() {
   const filteredDeliveryRows = applyAdminFilter(deliveryRows, state.adminFilters.delivery);
 
   if (shouldRenderAdminRole("baker")) {
+    const searchTerm = el.bakerSearchName ? el.bakerSearchName.value.toLowerCase() : "";
+    const filtered = searchTerm ? filteredBakerRows.filter(r => (r.name || "").toLowerCase().includes(searchTerm)) : filteredBakerRows;
     el.bakerSubmissionsTable.innerHTML = renderSubmissionCards(
+      filtered,
       filteredBakerRows,
       [
         { key: "bread_type", label: "Bread Type" },
@@ -596,8 +608,10 @@ function renderAdminRoleSections() {
   }
 
   if (shouldRenderAdminRole("bagger")) {
+    const searchTerm = el.baggerSearchName ? el.baggerSearchName.value.toLowerCase() : "";
+    const filtered = searchTerm ? filteredBaggerRows.filter(r => (r.name || "").toLowerCase().includes(searchTerm)) : filteredBaggerRows;
     el.baggerSubmissionsTable.innerHTML = renderSubmissionCards(
-      filteredBaggerRows,
+      filtered,
       [
         { key: "bread_type", label: "Bread Type" },
         { key: "received_count", label: "Received" },
@@ -610,8 +624,10 @@ function renderAdminRoleSections() {
   }
 
   if (shouldRenderAdminRole("sales")) {
+    const searchTerm = el.salesSearchName ? el.salesSearchName.value.toLowerCase() : "";
+    const filtered = searchTerm ? filteredSalesRows.filter(r => (r.name || "").toLowerCase().includes(searchTerm)) : filteredSalesRows;
     el.salesSubmissionsTable.innerHTML = renderSubmissionCards(
-      filteredSalesRows,
+      filtered,
       [
         { key: "bread_type", label: "Bread Type" },
         { key: "paid_count", label: "Paid" },
@@ -625,8 +641,10 @@ function renderAdminRoleSections() {
   }
 
   if (shouldRenderAdminRole("delivery")) {
+    const searchTerm = el.deliverySearchName ? el.deliverySearchName.value.toLowerCase() : "";
+    const filtered = searchTerm ? filteredDeliveryRows.filter(r => (r.name || "").toLowerCase().includes(searchTerm)) : filteredDeliveryRows;
     el.deliverySubmissionsTable.innerHTML = renderSubmissionCards(
-      filteredDeliveryRows,
+      filtered,
       [
         { key: "bread_type", label: "Bread Type" },
         { key: "taken_count", label: "Taken" },
@@ -698,6 +716,7 @@ function setAdminDashboardView(view, persist = true) {
     staff: ["staffManagementCard"],
     finance: ["financeCard"],
     rootcause: ["blameAnalysisCard"],
+    adjustments: ["adjustmentsCard"],
     submissions: ["bakerSubmissionsCard", "baggerSubmissionsCard", "salesSubmissionsCard", "deliverySubmissionsCard"],
   };
 
@@ -730,14 +749,16 @@ function buildQuickNav() {
   const role = state.user?.role;
   if (role === "admin") {
     el.quickNav.innerHTML = `
-      <button type="button" data-admin-view="overview">Dashboard</button>
-      <button type="button" data-admin-view="submissions">Submissions</button>
+      <button type="button" data-admin-view="overview" data-badge="overview">Dashboard</button>
+      <button type="button" data-admin-view="submissions" data-badge="submissions">Submissions</button>
       <button type="button" data-admin-view="staff">Staff Management</button>
       <button type="button" data-admin-view="rootcause">Root Cause Analysis</button>
       <button type="button" data-admin-view="finance">Finance</button>
+      <button type="button" data-admin-view="adjustments">Adjustments</button>
     `;
     el.quickNav.classList.remove("hidden");
     setAdminDashboardView(state.adminView, false);
+    updateMenuBadges();
     return;
   }
 
@@ -1114,6 +1135,8 @@ async function refreshAdmin() {
   }
 
   buildQuickNav();
+  // Update menu badges with latest alert counts
+  await updateMenuBadges();
 }
 
 async function loadBlameAnalysis() {
@@ -1183,6 +1206,161 @@ async function loadBlameAnalysis() {
   } catch (err) {
     el.blameAnalysisResults.innerHTML = `<p class="muted">Error loading analysis: ${err.message}</p>`;
   }
+}
+
+async function updateMenuBadges() {
+  if (!state.token || state.user.role !== "admin") return;
+  
+  try {
+    // Count critical/warning submissions per role
+    const countByRole = { baker: 0, bagger: 0, sales: 0, delivery: 0 };
+    
+    for (const role of Object.keys(countByRole)) {
+      const response = await api(`/api/admin/submissions?role=${role}&limit=1000`);
+      const submissions = response.submissions || [];
+      countByRole[role] = submissions.filter(s => s.severity === "critical" || s.severity === "warning").length;
+    }
+    
+    // Update badges on menu buttons
+    document.querySelectorAll('[data-badge="submissions"]').forEach(btn => {
+      const total = Object.values(countByRole).reduce((a, b) => a + b, 0);
+      if (total > 0) {
+        btn.innerHTML = `Submissions <span class="badge">${total}</span>`;
+      }
+    });
+  } catch (err) {
+    console.warn("Could not load badge counts:", err);
+  }
+}
+
+async function loadAdjustments() {
+  if (!state.token || state.user.role !== "admin" || !el.adjustmentsList) return;
+  
+  try {
+    const response = await api("/api/admin/adjustments");
+    const adjustments = response.adjustments || [];
+    
+    if (adjustments.length === 0) {
+      el.adjustmentsList.innerHTML = "<p class=\"muted\">No adjustments recorded</p>";
+      return;
+    }
+    
+    el.adjustmentsList.innerHTML = adjustments.map(adj => `
+      <div class="adjustment-item" style="border-left: 4px solid var(--color-accent); padding: 0.75rem; margin: 0.5rem 0; background: var(--color-bg-secondary); border-radius: 0.25rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+          <strong>${adj.table.toUpperCase()}</strong>
+          <small class="muted">${new Date(adj.adjusted_at).toLocaleString()}</small>
+        </div>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--color-text-secondary);">
+          ${adj.change_description || "Data correction applied"}
+        </p>
+        <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--color-muted);">
+          By: ${adj.admin_name || "Unknown"}
+        </p>
+      </div>
+    `).join("");
+  } catch (err) {
+    el.adjustmentsList.innerHTML = `<p class="muted">Error loading adjustments: ${err.message}</p>`;
+  }
+}
+
+function initFormValidation() {
+  // Production form validation
+  const productionForm = el.productionForm;
+  if (!productionForm) return;
+  
+  const rules = {
+    flourBags: (val) => val > 0 || "Must be greater than 0",
+    producedCount: (val) => val > 0 || "Must be greater than 0",
+    soldCount: (val) => val >= 0 || "Cannot be negative",
+  };
+  
+  const validateField = (fieldName, value) => {
+    const rule = rules[fieldName];
+    if (!rule) return "";
+    const result = rule(Number(value));
+    return result === true ? "" : result;
+  };
+  
+  // Clear validation on focus, validate on blur
+  productionForm.querySelectorAll("input[type=\"number\"]").forEach(field => {
+    field.addEventListener("blur", () => {
+      const error = validateField(field.name, field.value);
+      let errorEl = field.nextElementSibling;
+      if (errorEl && errorEl.classList.contains("field-error")) {
+        errorEl.remove();
+      }
+      if (error) {
+        const span = document.createElement("span");
+        span.className = "field-error";
+        span.style.cssText = "color: var(--color-critical); font-size: 0.8rem; display: block; margin-top: 0.25rem;";
+        span.textContent = error;
+        field.parentNode.insertBefore(span, field.nextSibling);
+      }
+    });
+  });
+}
+
+function wireSearchInputs() {
+  if (!state.token || state.user.role !== "admin") return;
+  
+  const searchFields = [
+    { el: el.bakerSearchName, debounceKey: "bakerSearch" },
+    { el: el.baggerSearchName, debounceKey: "baggerSearch" },
+    { el: el.salesSearchName, debounceKey: "salesSearch" },
+    { el: el.deliverySearchName, debounceKey: "deliverySearch" },
+  ];
+  
+  searchFields.forEach(({ el: field, debounceKey }) => {
+    if (!field) return;
+    
+    field.addEventListener("input", () => {
+      clearTimeout(window[debounceKey]);
+      window[debounceKey] = setTimeout(() => {
+        loadAdminData(false); // Refresh tables with search applied
+      }, 300);
+    });
+  });
+}
+
+function wireHistoryFilterDisplay() {
+  const historyFilterBar = document.getElementById("historyFilterBar");
+  if (!historyFilterBar) return;
+  
+  const dateInput = el.historyFromDate;
+  const breadInput = el.historyBreadType;
+  
+  const updateDisplay = () => {
+    const date = dateInput ? dateInput.value : "";
+    const bread = breadInput ? breadInput.value : "";
+    
+    let display = [];
+    if (date) display.push(`Date: ${new Date(date).toLocaleDateString()}`);
+    if (bread) display.push(`Bread: ${bread}`);
+    
+    const badges = display.map(text => 
+      `<span class="filter-badge" style="display: inline-block; background: var(--color-accent); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; margin: 0 0.25rem 0.25rem 0;">${text}</span>`
+    ).join("");
+    
+    let filterDisplay = document.getElementById("historyFilterDisplay");
+    if (!filterDisplay && display.length > 0) {
+      filterDisplay = document.createElement("div");
+      filterDisplay.id = "historyFilterDisplay";
+      filterDisplay.style.cssText = "margin-bottom: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.25rem;";
+      historyFilterBar.parentNode.insertBefore(filterDisplay, historyFilterBar.nextSibling);
+    }
+    
+    if (filterDisplay) {
+      if (display.length === 0) {
+        filterDisplay.remove();
+      } else {
+        filterDisplay.innerHTML = badges;
+      }
+    }
+  };
+  
+  if (dateInput) dateInput.addEventListener("change", updateDisplay);
+  if (breadInput) breadInput.addEventListener("change", updateDisplay);
 }
 
 
@@ -1261,15 +1439,27 @@ async function boot() {
     }
   };
 
-  if (el.exportCsvBtn) {
-    el.exportCsvBtn.onclick = () => {
+  if (el.exportOptionsToggle) {
+    el.exportOptionsToggle.onclick = () => {
+      el.exportOptionsPanel.classList.toggle("hidden");
+    };
+  }
+  
+  if (el.closeExportPanelBtn) {
+    el.closeExportPanelBtn.onclick = () => {
+      el.exportOptionsPanel.classList.add("hidden");
+    };
+  }
+  
+  if (el.executeExportBtn) {
+    el.executeExportBtn.onclick = () => {
       const date = el.reportDate.value || new Date().toISOString().slice(0, 10);
-      const params = new URLSearchParams({ date });
+      const scope = document.querySelector('input[name="exportScope"]:checked')?.value || 'all';
+      const params = new URLSearchParams({ date, scope });
       const a = document.createElement("a");
       a.href = `/api/admin/export-csv?${params.toString()}`;
-      a.download = `bigcat-report-${date}.csv`;
+      a.download = `bigcat-report-${date}-${scope}.csv`;
       if (state.token) {
-        // Use authenticated fetch to include bearer token, then trigger browser download.
         fetch(a.href, { headers: { Authorization: `Bearer ${state.token}` } })
           .then((response) => {
             if (!response.ok) {
@@ -1289,6 +1479,7 @@ async function boot() {
             link.remove();
             URL.revokeObjectURL(url);
             showToast("CSV export downloaded");
+            el.exportOptionsPanel.classList.add("hidden");
           })
           .catch((error) => showToast(error.message));
       }
@@ -1476,13 +1667,20 @@ async function afterAuth() {
       el.loadBlameAnalysisBtn.onclick = () => loadBlameAnalysis();
     }
     await loadBlameAnalysis();
+    // Load adjustments and wire up admin features
+    await loadAdjustments();
+    wireSearchInputs();
+    await updateMenuBadges();
   } else {
     renderFormsByRole();
-    // Show change-password card for staff (not admin)
-    if (state.user.role !== "admin" && el.changePasswordCard) {
-      el.changePasswordCard.classList.remove("hidden");
-      initChangePasswordForm();
-    }
+    // Initialize form validation for staff submission forms
+    initFormValidation();
+  }
+
+  // Show change-password card for all roles
+  if (el.changePasswordCard) {
+    el.changePasswordCard.classList.remove("hidden");
+    initChangePasswordForm();
   }
   
   // Setup batch history for both staff and admins
@@ -1502,6 +1700,7 @@ async function afterAuth() {
   // Load initial history and wire up filter
   await loadBatchHistory();
   el.applyHistoryFilter.onclick = () => loadBatchHistory();
+  wireHistoryFilterDisplay();
   
   if (state.user.role !== "admin") {
     try {

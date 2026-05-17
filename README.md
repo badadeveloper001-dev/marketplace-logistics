@@ -88,7 +88,7 @@ Database file is auto-created as bakery.db in the project root.
 ## Seeded Accounts
 
 - Admin: admin@bakery.com / admin123
-- Staff: created by admin from the dashboard, then log in with email / password
+- Staff: created by admin from the dashboard, then log in with phone number / last 4 digits of phone number
 
 ## Dashboards
 

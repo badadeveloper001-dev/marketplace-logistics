@@ -1215,6 +1215,27 @@ app.get("/api/admin/alerts", authRequired, roleRequired("admin"), (req, res) => 
 
 app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res) => {
   const { start, end, day } = toDateBounds(req.query.date);
+  const scope = req.query.scope || 'all'; // 'all' or 'errors'
+
+  let whereClause = 'WHERE p.created_at BETWEEN ? AND ?';
+  if (scope === 'errors') {
+    whereClause += ' AND (p.flagged = 1 OR p.severity IN ("critical", "warning"))';
+  }
+  
+  let baggerWhere = 'WHERE b.created_at BETWEEN ? AND ?';
+  if (scope === 'errors') {
+    baggerWhere += ' AND (b.flagged = 1 OR b.severity IN ("critical", "warning"))';
+  }
+  
+  let salesWhere = 'WHERE s.created_at BETWEEN ? AND ?';
+  if (scope === 'errors') {
+    salesWhere += ' AND (s.flagged = 1 OR s.severity IN ("critical", "warning"))';
+  }
+  
+  let deliveryWhere = 'WHERE d.created_at BETWEEN ? AND ?';
+  if (scope === 'errors') {
+    deliveryWhere += ' AND (d.flagged = 1 OR d.severity IN ("critical", "warning"))';
+  }
 
   const rows = db
     .prepare(
@@ -1223,7 +1244,7 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
               p.produced_count AS quantity, p.difference, p.severity
        FROM production_logs p
        JOIN users u ON u.id = p.user_id
-       WHERE p.created_at BETWEEN ? AND ?
+       ${whereClause}
 
        UNION ALL
 
@@ -1231,7 +1252,7 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
               b.bagged_count AS quantity, b.difference, b.severity
        FROM bagging_logs b
        JOIN users u ON u.id = b.user_id
-       WHERE b.created_at BETWEEN ? AND ?
+       ${baggerWhere}
 
        UNION ALL
 
@@ -1239,7 +1260,7 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
               s.total_sold AS quantity, s.difference, s.severity
        FROM sales_logs s
        JOIN users u ON u.id = s.user_id
-       WHERE s.created_at BETWEEN ? AND ?
+       ${salesWhere}
 
        UNION ALL
 
@@ -1247,7 +1268,7 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
               d.total_delivered AS quantity, d.difference, d.severity
        FROM delivery_logs d
        JOIN users u ON u.id = d.user_id
-       WHERE d.created_at BETWEEN ? AND ?
+       ${deliveryWhere}
           ) AS export_rows
           ORDER BY export_rows.created_at DESC`
     )
@@ -1267,7 +1288,7 @@ app.get("/api/admin/export-csv", authRequired, roleRequired("admin"), (req, res)
   );
 
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", `attachment; filename="bigcat-report-${day}.csv"`);
+  res.setHeader("Content-Disposition", `attachment; filename="bigcat-report-${day}-${scope}.csv"`);
   res.send(csv);
 });
 

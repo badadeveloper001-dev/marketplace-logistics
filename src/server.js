@@ -419,12 +419,14 @@ app.get("/api/health/persistence", async (_req, res) => {
 app.post("/api/production", authRequired, roleRequired("baker"), async (req, res) => {
   const {
     breadType,
+    flourKg,
     flourBags,
     producedCount,
     sugar,
     salt,
     preservative,
     butter,
+    softener,
     yeast,
     vegetableOil,
     improver,
@@ -434,17 +436,21 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
     return badRequest(res, "Invalid bread type");
   }
 
-  const flour = asNumber(flourBags);
+  const flourKgValue = asNumber(
+    flourKg ?? (flourBags !== undefined ? Number(flourBags) * 50 : undefined)
+  );
+  const flour = flourKgValue / 50;
   const produced = asNumber(producedCount);
   const ingSugar = asNumber(sugar);
   const ingSalt = asNumber(salt);
   const ingPreservative = asNumber(preservative);
   const ingButter = asNumber(butter);
-  const ingYeast = asNumber(yeast);
-  const ingVegetableOil = asNumber(vegetableOil);
+  const ingYeast = asNumber(softener ?? yeast ?? 0);
+  const ingVegetableOil = asNumber(vegetableOil ?? 0);
   const ingImprover = asNumber(improver);
 
   const values = [
+    flourKgValue,
     flour,
     produced,
     ingSugar,
@@ -542,6 +548,8 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
+    flourKg: flourKgValue,
+    flourBags: flour,
     expectedOutput,
     producedCount: produced,
     difference,
@@ -1611,7 +1619,7 @@ app.get("/api/admin/blame-analysis", authRequired, roleRequired("admin"), (req, 
 app.get("/api/staff/my-submissions", authRequired, (req, res) => {
   const production = db
     .prepare(
-      `SELECT id, bread_type, produced_count, expected_output, difference, created_at
+      `SELECT id, bread_type, flour_bags, produced_count, expected_output, sugar, salt, preservative, butter, yeast, improver, difference, created_at
        FROM production_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`
     )
     .all(req.user.id);

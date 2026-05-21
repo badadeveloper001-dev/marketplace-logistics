@@ -50,14 +50,13 @@ Discrepancy threshold:
 
 ## Ingredients Tracked
 
-- Flour
+- Flour (kg)
 - Sugar
 - Salt
 - Preservative
 - Butter
-- Yeast
-- Vegetable oil
-- Improver
+- Softener
+- Improva
 
 ## Tech Stack
 
@@ -96,17 +95,26 @@ Database file is auto-created as bakery.db in the project root.
 
 Inputs:
 
-- Flour bags used
+- Flour used (kg)
 - Bread type
 - Breads produced
-- Sugar, Salt, Preservative, Butter, Yeast, Vegetable Oil, Improver
+- Sugar, Salt, Preservative, Butter, Softener, Improva
 
 System:
 
-- Calculates expected output from flour bags
+- Uses 50kg flour = 1 bag for expected output calculations
 - Compares expected vs produced
 - Flags discrepancy when difference exceeds threshold
 - Stores full ingredient usage per batch
+
+Reference batch mix for 50kg flour:
+
+- Sugar: 7kg
+- Salt: 1kg
+- Preservative: 300g
+- Butter: 1kg
+- Softener: 50g
+- Improva: 50g
 
 ### Bagger
 

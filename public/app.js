@@ -134,16 +134,16 @@ function renderFormsByRole() {
       <p class="form-intro">Submit one batch at a time.</p>
       <h4 class="form-section-title">Production Details</h4>
       <label>Bread Type<select name="breadType" required>${options}</select></label>
-      <label>Flour Bags Used<input name="flourBags" type="number" min="0" step="0.01" required /></label>
+      <label>Flour Used (kg)<input name="flourKg" type="number" min="0" step="0.01" required /></label>
       <label>Breads Produced<input name="producedCount" type="number" min="0" step="1" required /></label>
       <h4 class="form-section-title span-2">Ingredient Inputs</h4>
       <label>Sugar Used (kg)<input name="sugar" type="number" min="0" step="0.01" required /></label>
       <label>Salt Used (kg)<input name="salt" type="number" min="0" step="0.01" required /></label>
       <label>Preservative Used (grams)<input name="preservative" type="number" min="0" step="0.01" required /></label>
       <label>Butter Used (kg)<input name="butter" type="number" min="0" step="0.01" required /></label>
-      <label>Yeast Used (grams)<input name="yeast" type="number" min="0" step="0.01" required /></label>
-      <label>Vegetable Oil Used (litres)<input name="vegetableOil" type="number" min="0" step="0.01" required /></label>
-      <label>Improver Used (grams)<input name="improver" type="number" min="0" step="0.01" required /></label>
+      <label>Softener Used (grams)<input name="softener" type="number" min="0" step="0.01" required /></label>
+      <label>Improva Used (grams)<input name="improver" type="number" min="0" step="0.01" required /></label>
+      <p class="muted span-2" style="margin-top:0.25rem">Standard per 50kg flour: Sugar 7kg, Salt 1kg, Preservative 300g, Butter 1kg, Softener 50g, Improva 50g.</p>
       <button type="submit">Submit Production</button>
       <div id="bakerPreview" class="staff-preview hidden"></div>
     `;
@@ -242,16 +242,14 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     target = document.getElementById("bakerPreview");
     fields = [
       previewField("Bread Type", submittedBody.breadType),
-      previewField("Received", submittedBody.receivedCount),
-      previewField("Flour Bags", submittedBody.flourBags),
+      previewField("Flour (kg)", submittedBody.flourKg),
       previewField("Produced", submittedBody.producedCount),
       previewField("Sugar", submittedBody.sugar),
       previewField("Salt", submittedBody.salt),
       previewField("Preservative", submittedBody.preservative),
       previewField("Butter", submittedBody.butter),
-      previewField("Yeast", submittedBody.yeast),
-      previewField("Vegetable Oil", submittedBody.vegetableOil),
-      previewField("Improver", submittedBody.improver),
+      previewField("Softener", submittedBody.softener),
+      previewField("Improva", submittedBody.improver),
     ].join("");
   }
 
@@ -259,7 +257,6 @@ function renderStaffSubmissionPreview(submittedBody, savedResult) {
     target = document.getElementById("baggerPreview");
     fields = [
       previewField("Bread Type", submittedBody.breadType),
-      previewField("Received", submittedBody.receivedCount),
       previewField("Received", submittedBody.receivedCount),
       previewField("Bagged", submittedBody.baggedCount),
     ].join("");
@@ -311,14 +308,13 @@ function renderStaffPreviewFromSavedRecord(record) {
     renderStaffSubmissionPreview(
       {
         breadType: record.bread_type,
-        flourBags: record.flour_bags,
+        flourKg: Number(record.flour_bags || 0) * 50,
         producedCount: record.produced_count,
         sugar: record.sugar,
         salt: record.salt,
         preservative: record.preservative,
         butter: record.butter,
-        yeast: record.yeast,
-        vegetableOil: record.vegetable_oil,
+        softener: record.yeast,
         improver: record.improver,
       },
       {
@@ -591,7 +587,7 @@ function renderAdminRoleSections() {
       filteredBakerRows,
       [
         { key: "bread_type", label: "Bread Type" },
-        { key: "flour_bags", label: "Flour Bags" },
+        { key: "flour_bags", label: "Flour (kg)", render: (v) => (Number(v) * 50).toFixed(2).replace(/\.00$/, "") },
         { key: "produced_count", label: "Produced" },
         { key: "difference", label: "Difference" },
         { key: "severity", label: "Status", render: (v) => severityBadge(v) },
@@ -599,9 +595,8 @@ function renderAdminRoleSections() {
         { key: "salt", label: "Salt" },
         { key: "preservative", label: "Preservative" },
         { key: "butter", label: "Butter" },
-        { key: "yeast", label: "Yeast" },
-        { key: "vegetable_oil", label: "Vegetable Oil" },
-        { key: "improver", label: "Improver" },
+        { key: "yeast", label: "Softener" },
+        { key: "improver", label: "Improva" },
       ],
       "Baker"
     );
@@ -1270,7 +1265,7 @@ function initFormValidation() {
   if (!productionForm) return;
   
   const rules = {
-    flourBags: (val) => val > 0 || "Must be greater than 0",
+    flourKg: (val) => val > 0 || "Must be greater than 0",
     producedCount: (val) => val > 0 || "Must be greater than 0",
     soldCount: (val) => val >= 0 || "Cannot be negative",
   };

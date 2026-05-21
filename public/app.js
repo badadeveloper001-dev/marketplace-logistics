@@ -60,6 +60,10 @@ const el = {
   alertSummary: document.getElementById("alertSummary"),
   topDiscrepancies: document.getElementById("topDiscrepancies"),
   financeSummary: document.getElementById("financeSummary"),
+  ingredientStockCard: document.getElementById("ingredientStockCard"),
+  ingredientStockForm: document.getElementById("ingredientStockForm"),
+  ingredientStockSummary: document.getElementById("ingredientStockSummary"),
+  ingredientStockTable: document.getElementById("ingredientStockTable"),
   bakerFilters: document.getElementById("bakerFilters"),
   baggerFilters: document.getElementById("baggerFilters"),
   salesFilters: document.getElementById("salesFilters"),
@@ -710,6 +714,7 @@ function setAdminDashboardView(view, persist = true) {
     overview: ["adminControlsCard"],
     staff: ["staffManagementCard"],
     finance: ["financeCard"],
+    stock: ["ingredientStockCard"],
     rootcause: ["blameAnalysisCard"],
     adjustments: ["adjustmentsCard"],
     submissions: ["bakerSubmissionsCard", "baggerSubmissionsCard", "salesSubmissionsCard", "deliverySubmissionsCard"],
@@ -749,6 +754,7 @@ function buildQuickNav() {
       <button type="button" data-admin-view="staff">Staff Management</button>
       <button type="button" data-admin-view="rootcause">Root Cause Analysis</button>
       <button type="button" data-admin-view="finance">Finance</button>
+      <button type="button" data-admin-view="stock">Ingredient Stock</button>
       <button type="button" data-admin-view="adjustments">Adjustments</button>
     `;
     el.quickNav.classList.remove("hidden");
@@ -783,6 +789,12 @@ function formatCurrency(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "N0";
   return `N${numeric.toLocaleString()}`;
+}
+
+function stockBadge(status) {
+  if (status === "critical") return '<span class="badge critical">critical</span>';
+  if (status === "warning") return '<span class="badge warning">low</span>';
+  return '<span class="badge ok">ok</span>';
 }
 
 function renderSubmissionCards(rows, fields, stageLabel) {
@@ -955,6 +967,7 @@ async function refreshAdmin() {
   const date = el.reportDate.value;
   const submissions = await api(`/api/admin/submissions?date=${date}`);
   const finance = await api(`/api/admin/finance?date=${date}`);
+  await loadIngredientStock();
   const bakerRows = Array.isArray(submissions.baker) ? submissions.baker : [];
   const baggerRows = Array.isArray(submissions.bagger) ? submissions.bagger : [];
   const salesRows = Array.isArray(submissions.sales) ? submissions.sales : [];
@@ -1132,6 +1145,102 @@ async function refreshAdmin() {
   buildQuickNav();
   // Update menu badges with latest alert counts
   await updateMenuBadges();
+}
+
+async function loadIngredientStock() {
+  if (!state.token || state.user?.role !== "admin" || !el.ingredientStockTable) return;
+  try {
+    const data = await api("/api/admin/ingredient-stock");
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+
+    if (el.ingredientStockSummary) {
+      el.ingredientStockSummary.innerHTML = `
+        <article class="alert-kpi neutral">
+          <span>Tracked Ingredients</span>
+          <strong>${data.summary?.trackedIngredients || rows.length}</strong>
+        </article>
+        <article class="alert-kpi warning">
+          <span>Low Stock</span>
+          <strong>${data.summary?.lowCount || 0}</strong>
+        </article>
+        <article class="alert-kpi critical">
+          <span>Critical Stock</span>
+          <strong>${data.summary?.criticalCount || 0}</strong>
+        </article>
+      `;
+    }
+
+    if (!rows.length) {
+      el.ingredientStockTable.innerHTML = '<p class="muted">No ingredient stock records yet.</p>';
+      return;
+    }
+
+    const labelMap = {
+      flour: "Flour",
+      sugar: "Sugar",
+      salt: "Salt",
+      preservative: "Preservative",
+      butter: "Butter",
+      yeast: "Softener",
+      improver: "Improva",
+      vegetable_oil: "Vegetable Oil",
+    };
+
+    el.ingredientStockTable.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Ingredient</th>
+            <th>Remaining</th>
+            <th>Unit</th>
+            <th>Warning</th>
+            <th>Critical</th>
+            <th>Status</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (row) => `
+                <tr>
+                  <td>${labelMap[row.ingredient] || row.ingredient}</td>
+                  <td>${Number(row.quantity || 0).toFixed(2).replace(/\.00$/, "")}</td>
+                  <td>${row.unit || "-"}</td>
+                  <td>${Number(row.warning_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
+                  <td>${Number(row.critical_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
+                  <td>${stockBadge(row.status)}</td>
+                  <td>${formatDateTime(row.updated_at)}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    el.ingredientStockTable.innerHTML = `<p class="muted">Could not load ingredient stock: ${error.message}</p>`;
+  }
+}
+
+function initIngredientStockForm() {
+  if (!el.ingredientStockForm) return;
+  el.ingredientStockForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const fd = new FormData(el.ingredientStockForm);
+    const payload = Object.fromEntries(fd.entries());
+    try {
+      await api("/api/admin/ingredient-stock/adjust", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      showToast("Ingredient stock updated");
+      el.ingredientStockForm.reset();
+      await loadIngredientStock();
+    } catch (error) {
+      showToast(error.message);
+    }
+  };
 }
 
 async function loadBlameAnalysis() {
@@ -1640,6 +1749,7 @@ async function afterAuth() {
     initAdminQuickNavEffects();
     initAdminAccordions();
     initCreateStaffForm();
+    initIngredientStockForm();
     loadStaffList();
     try {
       await refreshAdmin();

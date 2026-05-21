@@ -11,6 +11,7 @@ const {
   checkPostgresConnection,
   deleteUserAndRelatedRecords,
   BREAD_TYPES,
+  INGREDIENT_STOCK_META,
   THRESHOLD,
   getSeverity,
   maybeRecordDiscrepancy,
@@ -143,6 +144,71 @@ function analyzeIngredientDiscrepancy(flourKg, ingredients) {
     severity,
     flagged: Boolean(severity),
     details: details.filter((x) => x.severity),
+  };
+}
+
+function stockStatus(quantity, warningLevel, criticalLevel) {
+  if (quantity <= criticalLevel) return "critical";
+  if (quantity <= warningLevel) return "warning";
+  return "ok";
+}
+
+function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sourceId, actorUserId }) {
+  if (!Number.isFinite(usedAmount) || usedAmount <= 0) return null;
+
+  const current = db
+    .prepare("SELECT id, quantity, unit, warning_level, critical_level FROM ingredient_stock WHERE ingredient = ?")
+    .get(ingredient);
+  if (!current) return null;
+
+  const nextQuantity = Number(current.quantity || 0) - usedAmount;
+  db.prepare("UPDATE ingredient_stock SET quantity = ?, updated_at = datetime('now') WHERE id = ?").run(
+    nextQuantity,
+    current.id
+  );
+  db.prepare(
+    `INSERT INTO ingredient_stock_movements
+     (ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, actor_user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    ingredient,
+    -usedAmount,
+    nextQuantity,
+    current.unit,
+    reason,
+    sourceType || null,
+    sourceId || null,
+    actorUserId || null
+  );
+
+  if (pgPool) {
+    pgPool
+      .query(
+        `UPDATE ingredient_stock
+         SET quantity = quantity - $1, updated_at = NOW()
+         WHERE ingredient = $2
+         RETURNING quantity, unit`,
+        [usedAmount, ingredient]
+      )
+      .then((result) => {
+        const row = result.rows[0];
+        if (!row) return;
+        return pgPool.query(
+          `INSERT INTO ingredient_stock_movements
+           (ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, actor_user_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [ingredient, -usedAmount, row.quantity, row.unit, reason, sourceType || null, sourceId || null, actorUserId || null]
+        );
+      })
+      .catch((err) => console.error("PG ingredient stock usage update failed:", err.message));
+  }
+
+  return {
+    ingredient,
+    used: usedAmount,
+    remaining: nextQuantity,
+    unit: current.unit,
+    status: stockStatus(nextQuantity, Number(current.warning_level || 0), Number(current.critical_level || 0)),
   };
 }
 
@@ -597,6 +663,65 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
     createdAt,
   });
 
+  const stockImpact = [
+    recordIngredientUsage({
+      ingredient: "flour",
+      usedAmount: flourKgValue,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "sugar",
+      usedAmount: ingSugar,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "salt",
+      usedAmount: ingSalt,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "preservative",
+      usedAmount: ingPreservative,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "butter",
+      usedAmount: ingButter,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "yeast",
+      usedAmount: ingYeast,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+    recordIngredientUsage({
+      ingredient: "improver",
+      usedAmount: ingImprover,
+      reason: "Baker production usage",
+      sourceType: "production",
+      sourceId: info.lastInsertRowid,
+      actorUserId: req.user.id,
+    }),
+  ].filter(Boolean);
+
   res.status(201).json({
     id: info.lastInsertRowid,
     breadType,
@@ -612,6 +737,7 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
       severity: ingredientAnalysis.severity,
       details: ingredientAnalysis.details,
     },
+    stockImpact,
     createdAt,
   });
 });
@@ -990,6 +1116,7 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
       await Promise.all(tables.map((t) =>
         pgPool.query(`DELETE FROM ${t} WHERE user_id = $1`, [id]).catch(() => null)
       ));
+      await pgPool.query("UPDATE ingredient_stock_movements SET actor_user_id = NULL WHERE actor_user_id = $1", [id]);
       await pgDirectDelete("users", id);
     }
   } catch (error) {
@@ -1085,6 +1212,100 @@ app.get("/api/admin/ingredients", authRequired, roleRequired("admin"), (req, res
     .all(start, end);
 
   res.json({ date: day, totals, batches });
+});
+
+app.get("/api/admin/ingredient-stock", authRequired, roleRequired("admin"), (req, res) => {
+  const stockRows = db
+    .prepare(
+      `SELECT id, ingredient, quantity, unit, warning_level, critical_level, updated_at
+       FROM ingredient_stock
+       ORDER BY ingredient ASC`
+    )
+    .all();
+
+  const rows = stockRows.map((row) => ({
+    ...row,
+    status: stockStatus(Number(row.quantity || 0), Number(row.warning_level || 0), Number(row.critical_level || 0)),
+  }));
+  const lowCount = rows.filter((r) => r.status === "warning" || r.status === "critical").length;
+  const criticalCount = rows.filter((r) => r.status === "critical").length;
+
+  const recentMovements = db
+    .prepare(
+      `SELECT ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, created_at
+       FROM ingredient_stock_movements
+       ORDER BY created_at DESC
+       LIMIT 25`
+    )
+    .all();
+
+  res.json({
+    rows,
+    summary: {
+      trackedIngredients: rows.length,
+      lowCount,
+      criticalCount,
+    },
+    recentMovements,
+  });
+});
+
+app.post("/api/admin/ingredient-stock/adjust", authRequired, roleRequired("admin"), (req, res) => {
+  const ingredient = String(req.body.ingredient || "").trim();
+  const action = String(req.body.action || "add").trim(); // add | subtract | set
+  const quantity = asNumber(req.body.quantity);
+  const reason = String(req.body.reason || "Manual stock adjustment").trim();
+
+  if (!Object.prototype.hasOwnProperty.call(INGREDIENT_STOCK_META, ingredient)) {
+    return badRequest(res, "Invalid ingredient");
+  }
+  if (!Number.isFinite(quantity) || quantity < 0) {
+    return badRequest(res, "Quantity must be a non-negative number");
+  }
+  if (!["add", "subtract", "set"].includes(action)) {
+    return badRequest(res, "Action must be add, subtract, or set");
+  }
+
+  const row = db
+    .prepare("SELECT id, quantity, unit, warning_level, critical_level FROM ingredient_stock WHERE ingredient = ?")
+    .get(ingredient);
+  if (!row) {
+    return res.status(404).json({ error: "Ingredient stock row not found" });
+  }
+
+  const oldQty = Number(row.quantity || 0);
+  const nextQty = action === "set" ? quantity : action === "add" ? oldQty + quantity : oldQty - quantity;
+  const changeAmount = nextQty - oldQty;
+
+  db.prepare("UPDATE ingredient_stock SET quantity = ?, updated_at = datetime('now') WHERE id = ?").run(nextQty, row.id);
+  db.prepare(
+    `INSERT INTO ingredient_stock_movements
+     (ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, actor_user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(ingredient, changeAmount, nextQty, row.unit, reason, "admin_adjustment", null, req.user.id);
+
+  if (pgPool) {
+    pgPool
+      .query("UPDATE ingredient_stock SET quantity = $1, updated_at = NOW() WHERE ingredient = $2", [nextQty, ingredient])
+      .then(() =>
+        pgPool.query(
+          `INSERT INTO ingredient_stock_movements
+           (ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, actor_user_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [ingredient, changeAmount, nextQty, row.unit, reason, "admin_adjustment", null, req.user.id]
+        )
+      )
+      .catch((err) => console.error("PG ingredient stock adjustment failed:", err.message));
+  }
+
+  const status = stockStatus(nextQty, Number(row.warning_level || 0), Number(row.critical_level || 0));
+  res.json({
+    ingredient,
+    quantity: nextQty,
+    unit: row.unit,
+    status,
+    changeAmount,
+  });
 });
 
 app.get("/api/admin/discrepancies", authRequired, roleRequired("admin"), (req, res) => {

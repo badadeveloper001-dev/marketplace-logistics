@@ -186,6 +186,40 @@
                 <div id="financeSummary" class="finance-summary" style="margin-top:0.75rem"></div>
               </article>
 
+              <article id="ingredientStockCard" class="card" data-nav-label="Ingredient Stock">
+                <h3>Ingredient Stock</h3>
+                <p class="muted">Stock reduces automatically when baker submissions are made.</p>
+                <form id="ingredientStockForm" class="form-grid" style="margin-top:0.75rem; margin-bottom:1rem;">
+                  <label>Ingredient
+                    <select name="ingredient" required>
+                      <option value="flour">Flour (kg)</option>
+                      <option value="sugar">Sugar (kg)</option>
+                      <option value="salt">Salt (kg)</option>
+                      <option value="preservative">Preservative (g)</option>
+                      <option value="butter">Butter (kg)</option>
+                      <option value="yeast">Softener (g)</option>
+                      <option value="improver">Improva (g)</option>
+                    </select>
+                  </label>
+                  <label>Action
+                    <select name="action" required>
+                      <option value="add">Add Stock</option>
+                      <option value="subtract">Subtract Stock</option>
+                      <option value="set">Set Exact Quantity</option>
+                    </select>
+                  </label>
+                  <label>Quantity
+                    <input name="quantity" type="number" min="0" step="0.01" required />
+                  </label>
+                  <label class="span-2">Reason
+                    <input name="reason" placeholder="e.g. New supply delivered" />
+                  </label>
+                  <button type="submit">Update Stock</button>
+                </form>
+                <div id="ingredientStockSummary" class="admin-alert-summary"></div>
+                <div id="ingredientStockTable" class="scroll-table" style="margin-top:0.75rem"></div>
+              </article>
+
               <article id="adminControlsCard" class="card section-span" data-nav-label="Controls">
                 <div class="row-between">
                   <h3>Admin Dashboard</h3>

@@ -105,6 +105,47 @@ function asNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+const INGREDIENT_BASELINE_PER_50KG = {
+  sugar: 7,
+  salt: 1,
+  preservative: 300,
+  butter: 1,
+  softener: 50,
+  improva: 50,
+};
+
+function severityRank(severity) {
+  if (severity === "critical") return 2;
+  if (severity === "warning") return 1;
+  return 0;
+}
+
+function analyzeIngredientDiscrepancy(flourKg, ingredients) {
+  if (!Number.isFinite(flourKg) || flourKg <= 0) {
+    return { severity: null, flagged: false, details: [] };
+  }
+
+  const multiplier = flourKg / 50;
+  const details = Object.entries(INGREDIENT_BASELINE_PER_50KG).map(([key, base]) => {
+    const expected = base * multiplier;
+    const actual = Number(ingredients[key] || 0);
+    const delta = actual - expected;
+    const pct = expected > 0 ? Math.abs(delta) / expected : 0;
+    let severity = null;
+    if (pct > 0.2) severity = "critical";
+    else if (pct > 0.1) severity = "warning";
+    return { key, expected, actual, delta, pct, severity };
+  });
+
+  const maxRank = Math.max(...details.map((x) => severityRank(x.severity)), 0);
+  const severity = maxRank === 2 ? "critical" : maxRank === 1 ? "warning" : null;
+  return {
+    severity,
+    flagged: Boolean(severity),
+    details: details.filter((x) => x.severity),
+  };
+}
+
 function createStaffUsernameFromPhone(normalizedPhone) {
   // Use full normalized phone to avoid collisions across different numbers.
   return `staff_${normalizedPhone}`;
@@ -390,9 +431,8 @@ app.get("/api/meta", authRequired, (req, res) => {
       "salt",
       "preservative",
       "butter",
-      "yeast",
-      "vegetable_oil",
-      "improver",
+      "softener",
+      "improva",
     ],
   });
 });
@@ -468,7 +508,19 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
 
   const expectedOutput = flour * BREAD_TYPES[breadType].fromFlourBag;
   const difference = expectedOutput - produced;
-  const severity = getSeverity(Math.abs(difference));
+  const loafSeverity = getSeverity(Math.abs(difference));
+  const ingredientAnalysis = analyzeIngredientDiscrepancy(flourKgValue, {
+    sugar: ingSugar,
+    salt: ingSalt,
+    preservative: ingPreservative,
+    butter: ingButter,
+    softener: ingYeast,
+    improva: ingImprover,
+  });
+  const severity =
+    severityRank(ingredientAnalysis.severity) > severityRank(loafSeverity)
+      ? ingredientAnalysis.severity
+      : loafSeverity;
   const flagged = severity ? 1 : 0;
 
   const info = db
@@ -555,6 +607,11 @@ app.post("/api/production", authRequired, roleRequired("baker"), async (req, res
     difference,
     flagged: Boolean(flagged),
     severity,
+    ingredientDiscrepancy: {
+      flagged: ingredientAnalysis.flagged,
+      severity: ingredientAnalysis.severity,
+      details: ingredientAnalysis.details,
+    },
     createdAt,
   });
 });

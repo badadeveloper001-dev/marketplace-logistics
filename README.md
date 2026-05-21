@@ -104,6 +104,7 @@ System:
 
 - Uses 50kg flour = 1 bag for expected output calculations
 - Compares expected vs produced
+- Flags ingredient discrepancy when ingredient usage deviates from the 50kg baseline mix
 - Flags discrepancy when difference exceeds threshold
 - Stores full ingredient usage per batch
 

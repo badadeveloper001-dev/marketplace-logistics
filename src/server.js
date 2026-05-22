@@ -1129,46 +1129,7 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
 
-  const ingredientRollback = db
-    .prepare(
-      `SELECT
-         COALESCE(SUM(flour_bags), 0) * 50 AS flour,
-         COALESCE(SUM(sugar), 0) AS sugar,
-         COALESCE(SUM(salt), 0) AS salt,
-         COALESCE(SUM(preservative), 0) AS preservative,
-         COALESCE(SUM(butter), 0) AS butter,
-         COALESCE(SUM(yeast), 0) AS yeast,
-         COALESCE(SUM(vegetable_oil), 0) AS vegetable_oil,
-         COALESCE(SUM(improver), 0) AS improver
-       FROM production_logs
-       WHERE user_id = ?`
-    )
-    .get(id);
-
   deleteUserAndRelatedRecords(id);
-
-  const rollbackMap = {
-    flour: ingredientRollback.flour,
-    sugar: ingredientRollback.sugar,
-    salt: ingredientRollback.salt,
-    preservative: ingredientRollback.preservative,
-    butter: ingredientRollback.butter,
-    yeast: ingredientRollback.yeast,
-    vegetable_oil: ingredientRollback.vegetable_oil,
-    improver: ingredientRollback.improver,
-  };
-  Object.entries(rollbackMap).forEach(([ingredient, amount]) => {
-    if (Number(amount) > 0) {
-      applyIngredientStockChange({
-        ingredient,
-        changeAmount: Number(amount),
-        reason: "Rollback after staff removal",
-        sourceType: "staff_delete",
-        sourceId: id,
-        actorUserId: req.user.id,
-      });
-    }
-  });
 
   try {
     if (pgPool) {

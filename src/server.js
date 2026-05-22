@@ -148,6 +148,7 @@ function analyzeIngredientDiscrepancy(flourKg, ingredients) {
 }
 
 function stockStatus(quantity, warningLevel, criticalLevel) {
+  if (quantity === 0) return "not_set";
   if (quantity <= criticalLevel) return "critical";
   if (quantity <= warningLevel) return "warning";
   return "ok";

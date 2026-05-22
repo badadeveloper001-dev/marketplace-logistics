@@ -792,6 +792,7 @@ function formatCurrency(value) {
 }
 
 function stockBadge(status) {
+  if (status === "not_set") return '<span class="badge neutral">not set</span>';
   if (status === "critical") return '<span class="badge critical">critical</span>';
   if (status === "warning") return '<span class="badge warning">low</span>';
   return '<span class="badge ok">ok</span>';

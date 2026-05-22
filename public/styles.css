@@ -896,6 +896,7 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 .badge.warning  { background: var(--warning-soft); color: var(--warning); }
 .badge.critical { background: var(--danger-soft);  color: var(--danger); }
 .badge.ok       { background: var(--accent-soft);  color: #9A700A; }
+.badge.neutral  { background: #f0f0f0; color: #888; }
 
 /* ─── Form Helpers ───────────────────────────────────────────────── */
 .form-intro {

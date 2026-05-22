@@ -1208,8 +1208,8 @@ async function loadIngredientStock() {
                   <td>${labelMap[row.ingredient] || row.ingredient}</td>
                   <td>${Number(row.quantity || 0).toFixed(2).replace(/\.00$/, "")}</td>
                   <td>${row.unit || "-"}</td>
-                  <td>${Number(row.warning_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
-                  <td>${Number(row.critical_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
+                  <td>${row.status === "not_set" ? "-" : Number(row.warning_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
+                  <td>${row.status === "not_set" ? "-" : Number(row.critical_level || 0).toFixed(2).replace(/\.00$/, "")}</td>
                   <td>${stockBadge(row.status)}</td>
                   <td>${formatDateTime(row.updated_at)}</td>
                 </tr>

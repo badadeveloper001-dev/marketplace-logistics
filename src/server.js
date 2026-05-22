@@ -524,6 +524,17 @@ app.get("/api/meta", authRequired, (req, res) => {
   });
 });
 
+app.get("/api/admin/handover-checklist", authRequired, roleRequired("admin"), (_req, res) => {
+  res.json({
+    adminAccessCode: ADMIN_ACCESS_CODE,
+    steps: [
+      "Set exact opening stock for each ingredient.",
+      "Use Add/Subtract actions for daily stock changes.",
+      "Review low/critical alerts after baker submissions.",
+    ],
+  });
+});
+
 app.get("/api/health/persistence", async (_req, res) => {
   const postgres = await checkPostgresConnection();
   const durable = postgres.configured && postgres.connected;

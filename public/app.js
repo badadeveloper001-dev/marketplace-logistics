@@ -61,6 +61,7 @@ const el = {
   topDiscrepancies: document.getElementById("topDiscrepancies"),
   financeSummary: document.getElementById("financeSummary"),
   ingredientStockCard: document.getElementById("ingredientStockCard"),
+  ownerHandoverChecklist: document.getElementById("ownerHandoverChecklist"),
   ingredientStockForm: document.getElementById("ingredientStockForm"),
   ingredientStockSummary: document.getElementById("ingredientStockSummary"),
   ingredientStockTable: document.getElementById("ingredientStockTable"),
@@ -1151,8 +1152,24 @@ async function refreshAdmin() {
 async function loadIngredientStock() {
   if (!state.token || state.user?.role !== "admin" || !el.ingredientStockTable) return;
   try {
-    const data = await api("/api/admin/ingredient-stock");
+    const [data, handover] = await Promise.all([
+      api("/api/admin/ingredient-stock"),
+      api("/api/admin/handover-checklist"),
+    ]);
     const rows = Array.isArray(data.rows) ? data.rows : [];
+    const safeAccessCode = String(handover?.adminAccessCode || "-").replace(/[&<>"']/g, "");
+
+    if (el.ownerHandoverChecklist) {
+      el.ownerHandoverChecklist.innerHTML = `
+        <h4>Owner Handover Checklist</h4>
+        <p><strong>Admin Access Code:</strong> <span class="handover-code">${safeAccessCode}</span></p>
+        <ol>
+          <li>Open Ingredient Stock and add first stock quantities for all ingredients you currently have.</li>
+          <li>Use action <strong>Set Exact Quantity</strong> for the first setup, then use Add/Subtract for daily updates.</li>
+          <li>After each baker submission, review Low/Critical alerts and top-up any ingredient before it blocks production.</li>
+        </ol>
+      `;
+    }
 
     if (el.ingredientStockSummary) {
       el.ingredientStockSummary.innerHTML = `

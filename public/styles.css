@@ -898,6 +898,37 @@ tbody tr:hover { background: rgba(184,134,11,0.025); }
 .badge.ok       { background: var(--accent-soft);  color: #9A700A; }
 .badge.neutral  { background: #f0f0f0; color: #888; }
 
+.handover-checklist {
+  margin-top: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.handover-checklist h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+}
+
+.handover-checklist p {
+  margin: 0 0 0.5rem;
+}
+
+.handover-checklist ol {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.handover-code {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 /* ─── Form Helpers ───────────────────────────────────────────────── */
 .form-intro {
   font-size: 0.875rem;

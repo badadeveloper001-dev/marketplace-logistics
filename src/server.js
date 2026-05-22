@@ -153,15 +153,15 @@ function stockStatus(quantity, warningLevel, criticalLevel) {
   return "ok";
 }
 
-function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sourceId, actorUserId }) {
-  if (!Number.isFinite(usedAmount) || usedAmount <= 0) return null;
+function applyIngredientStockChange({ ingredient, changeAmount, reason, sourceType, sourceId, actorUserId }) {
+  if (!Number.isFinite(changeAmount) || changeAmount === 0) return null;
 
   const current = db
     .prepare("SELECT id, quantity, unit, warning_level, critical_level FROM ingredient_stock WHERE ingredient = ?")
     .get(ingredient);
   if (!current) return null;
 
-  const nextQuantity = Number(current.quantity || 0) - usedAmount;
+  const nextQuantity = Number(current.quantity || 0) + changeAmount;
   db.prepare("UPDATE ingredient_stock SET quantity = ?, updated_at = datetime('now') WHERE id = ?").run(
     nextQuantity,
     current.id
@@ -172,7 +172,7 @@ function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sou
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     ingredient,
-    -usedAmount,
+    changeAmount,
     nextQuantity,
     current.unit,
     reason,
@@ -185,10 +185,10 @@ function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sou
     pgPool
       .query(
         `UPDATE ingredient_stock
-         SET quantity = quantity - $1, updated_at = NOW()
+         SET quantity = quantity + $1, updated_at = NOW()
          WHERE ingredient = $2
          RETURNING quantity, unit`,
-        [usedAmount, ingredient]
+        [changeAmount, ingredient]
       )
       .then((result) => {
         const row = result.rows[0];
@@ -197,18 +197,38 @@ function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sou
           `INSERT INTO ingredient_stock_movements
            (ingredient, change_amount, quantity_after, unit, reason, source_type, source_id, actor_user_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [ingredient, -usedAmount, row.quantity, row.unit, reason, sourceType || null, sourceId || null, actorUserId || null]
+          [ingredient, changeAmount, row.quantity, row.unit, reason, sourceType || null, sourceId || null, actorUserId || null]
         );
       })
-      .catch((err) => console.error("PG ingredient stock usage update failed:", err.message));
+      .catch((err) => console.error("PG ingredient stock change failed:", err.message));
   }
 
   return {
     ingredient,
-    used: usedAmount,
-    remaining: nextQuantity,
+    changeAmount,
+    quantity: nextQuantity,
     unit: current.unit,
     status: stockStatus(nextQuantity, Number(current.warning_level || 0), Number(current.critical_level || 0)),
+  };
+}
+
+function recordIngredientUsage({ ingredient, usedAmount, reason, sourceType, sourceId, actorUserId }) {
+  if (!Number.isFinite(usedAmount) || usedAmount <= 0) return null;
+  const result = applyIngredientStockChange({
+    ingredient,
+    changeAmount: -usedAmount,
+    reason,
+    sourceType,
+    sourceId,
+    actorUserId,
+  });
+  if (!result) return null;
+  return {
+    ingredient,
+    used: usedAmount,
+    remaining: result.quantity,
+    unit: result.unit,
+    status: result.status,
   };
 }
 
@@ -1108,7 +1128,47 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
   const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id);
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
+
+  const ingredientRollback = db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(flour_bags), 0) * 50 AS flour,
+         COALESCE(SUM(sugar), 0) AS sugar,
+         COALESCE(SUM(salt), 0) AS salt,
+         COALESCE(SUM(preservative), 0) AS preservative,
+         COALESCE(SUM(butter), 0) AS butter,
+         COALESCE(SUM(yeast), 0) AS yeast,
+         COALESCE(SUM(vegetable_oil), 0) AS vegetable_oil,
+         COALESCE(SUM(improver), 0) AS improver
+       FROM production_logs
+       WHERE user_id = ?`
+    )
+    .get(id);
+
   deleteUserAndRelatedRecords(id);
+
+  const rollbackMap = {
+    flour: ingredientRollback.flour,
+    sugar: ingredientRollback.sugar,
+    salt: ingredientRollback.salt,
+    preservative: ingredientRollback.preservative,
+    butter: ingredientRollback.butter,
+    yeast: ingredientRollback.yeast,
+    vegetable_oil: ingredientRollback.vegetable_oil,
+    improver: ingredientRollback.improver,
+  };
+  Object.entries(rollbackMap).forEach(([ingredient, amount]) => {
+    if (Number(amount) > 0) {
+      applyIngredientStockChange({
+        ingredient,
+        changeAmount: Number(amount),
+        reason: "Rollback after staff removal",
+        sourceType: "staff_delete",
+        sourceId: id,
+        actorUserId: req.user.id,
+      });
+    }
+  });
 
   try {
     if (pgPool) {
@@ -1702,6 +1762,36 @@ app.patch("/api/admin/adjust/:table/:id", authRequired, roleRequired("admin"), (
 
   const oldValue = existing[fieldName];
 
+  let stockChange = null;
+  if (table === "production_logs") {
+    const numericFields = {
+      flour_bags: { ingredient: "flour", multiplier: 50 },
+      sugar: { ingredient: "sugar", multiplier: 1 },
+      salt: { ingredient: "salt", multiplier: 1 },
+      preservative: { ingredient: "preservative", multiplier: 1 },
+      butter: { ingredient: "butter", multiplier: 1 },
+      yeast: { ingredient: "yeast", multiplier: 1 },
+      vegetable_oil: { ingredient: "vegetable_oil", multiplier: 1 },
+      improver: { ingredient: "improver", multiplier: 1 },
+    };
+    const map = numericFields[fieldName];
+    if (map) {
+      const oldNum = asNumber(oldValue);
+      const newNum = asNumber(newValue);
+      if (!Number.isFinite(newNum) || newNum < 0) {
+        return badRequest(res, "New value must be a non-negative number for this field");
+      }
+      if (!Number.isFinite(oldNum)) {
+        return badRequest(res, "Existing value is invalid; cannot reconcile stock");
+      }
+      const deltaUsage = (newNum - oldNum) * map.multiplier;
+      stockChange = {
+        ingredient: map.ingredient,
+        changeAmount: -deltaUsage,
+      };
+    }
+  }
+
   const tx = db.transaction(() => {
     db.prepare(`UPDATE ${table} SET ${fieldName} = ?, adjusted_by = ?, adjusted_at = datetime('now') WHERE id = ?`).run(
       newValue,
@@ -1716,6 +1806,17 @@ app.patch("/api/admin/adjust/:table/:id", authRequired, roleRequired("admin"), (
   });
 
   tx();
+  let stockReconciliation = null;
+  if (stockChange && stockChange.changeAmount !== 0) {
+    stockReconciliation = applyIngredientStockChange({
+      ingredient: stockChange.ingredient,
+      changeAmount: stockChange.changeAmount,
+      reason: `Adjustment reconciliation (${fieldName})`,
+      sourceType: "admin_adjustment",
+      sourceId: id,
+      actorUserId: req.user.id,
+    });
+  }
   queueSupabaseSync();
 
   res.json({
@@ -1726,6 +1827,7 @@ app.patch("/api/admin/adjust/:table/:id", authRequired, roleRequired("admin"), (
     oldValue,
     newValue,
     reason,
+    stockReconciliation,
   });
 });
 

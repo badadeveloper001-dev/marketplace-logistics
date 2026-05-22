@@ -263,3 +263,32 @@ You can also verify from the running app:
 - GET /api/health/persistence
 
 On Vercel, this endpoint returns HTTP 503 when durable PostgreSQL persistence is not active.
+
+## Duplicate For A New Client
+
+Use the built-in script to create a clean reusable copy of this project.
+
+Run from the current project root:
+
+npm run duplicate:client -- ../bakery-client-new bakery-client-new
+
+Arguments:
+
+- First argument: target directory for the duplicate project
+- Second argument (optional): new package name to write into package.json
+
+What the script does automatically:
+
+- Copies project files without .git history
+- Excludes local secrets and runtime files (.env*, node_modules, .vercel)
+- Excludes local SQLite files (bakery.db*)
+- Removes vercel.json from the duplicate so you can attach a fresh deployment
+- Creates .env.example in the duplicate with safe placeholders
+
+After duplication:
+
+1. cd into the new folder
+2. npm install
+3. Set your new client environment variables
+4. Start locally with npm start
+5. Connect the new folder/repo to its own Vercel project

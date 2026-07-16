@@ -44,10 +44,27 @@ const alertTransport = smtpConfigured
     })
   : null;
 
-const dbReady = initDb().catch((error) => {
-  console.error("Database initialization failed:", error);
-  throw error;
-});
+let dbInitError = null;
+let dbReady = null;
+let lastDbInitAttempt = 0;
+const DB_INIT_RETRY_INTERVAL_MS = Number(process.env.DB_INIT_RETRY_INTERVAL_MS || 3000);
+
+function startDbInit() {
+  lastDbInitAttempt = Date.now();
+  dbReady = initDb()
+    .then(() => {
+      dbInitError = null;
+      return null;
+    })
+    .catch((error) => {
+      dbInitError = error;
+      console.error("Database initialization failed:", error);
+      return null;
+    });
+  return dbReady;
+}
+
+startDbInit();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public"), {
@@ -61,6 +78,12 @@ app.use(express.static(path.join(__dirname, "..", "public"), {
 app.use(async (_req, _res, next) => {
   try {
     await dbReady;
+    if (dbInitError && Date.now() - lastDbInitAttempt >= DB_INIT_RETRY_INTERVAL_MS) {
+      await startDbInit();
+    }
+    if (dbInitError) {
+      throw dbInitError;
+    }
     next();
   } catch (error) {
     next(error);

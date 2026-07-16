@@ -6,3 +6,4 @@ bakery.db-wal
 npm-debug.log*
 .vercel
 .env*.local
+.env*

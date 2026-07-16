@@ -97,15 +97,27 @@ function buildPgConfig(url) {
   }
 }
 
+function parseEnvInt(name, fallback) {
+  const raw = String(process.env[name] || "").trim();
+  if (!raw) return fallback;
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+const pgFamily = (() => {
+  const value = parseEnvInt("PG_FAMILY", 4);
+  return value === 6 ? 6 : 4;
+})();
+
 const pgPool = USE_POSTGRES
   ? new Pool({
       ...buildPgConfig(POSTGRES_URL),
       ssl: { rejectUnauthorized: false },
-  family: Number.isFinite(Number(process.env.PG_FAMILY)) ? Number(process.env.PG_FAMILY) : 4,
-      connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 8000),
-      idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 10000),
-      max: Number(process.env.PG_POOL_MAX || 10),
-      statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT_MS || 10000),
+      family: pgFamily,
+      connectionTimeoutMillis: parseEnvInt("PG_CONNECT_TIMEOUT_MS", 8000),
+      idleTimeoutMillis: parseEnvInt("PG_IDLE_TIMEOUT_MS", 10000),
+      max: parseEnvInt("PG_POOL_MAX", 10),
+      statement_timeout: parseEnvInt("PG_STATEMENT_TIMEOUT_MS", 10000),
     })
   : null;
 

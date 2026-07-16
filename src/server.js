@@ -1160,11 +1160,35 @@ app.delete("/api/admin/staff/:id", authRequired, roleRequired("admin"), async (r
   if (!Number.isInteger(id) || id <= 0) {
     return badRequest(res, "Invalid staff ID");
   }
-  const user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id);
+
+  let user = null;
+  if (pgPool) {
+    try {
+      const result = await pgPool.query("SELECT id, role FROM users WHERE id = $1 LIMIT 1", [id]);
+      user = result.rows?.[0] || null;
+    } catch (error) {
+      console.error("PG lookup failed during staff deletion:", error.message);
+      if (IS_VERCEL) {
+        return res.status(500).json({ error: "Failed to verify staff record. Please try again." });
+      }
+    }
+  }
+
+  if (!user) {
+    user = db.prepare("SELECT id, role FROM users WHERE id = ?").get(id);
+  }
+
   if (!user) return res.status(404).json({ error: "Staff not found" });
   if (user.role === "admin") return res.status(403).json({ error: "Cannot delete admin" });
 
-  deleteUserAndRelatedRecords(id);
+  try {
+    deleteUserAndRelatedRecords(id);
+  } catch (error) {
+    console.error("SQLite delete failed during staff deletion:", error.message);
+    if (IS_VERCEL) {
+      return res.status(500).json({ error: "Failed to delete local staff record. Please try again." });
+    }
+  }
 
   try {
     if (pgPool) {

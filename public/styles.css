@@ -1445,3 +1445,79 @@ body[data-role="admin"] .quick-nav::-webkit-scrollbar-thumb {
     gap: 1.25rem;
   }
 }
+
+/* ─── Admin Decongestion Pass ───────────────────────────────────── */
+body[data-role="admin"] #adminPanel {
+  max-width: 1040px;
+  margin: 0 auto;
+  gap: 1.35rem;
+}
+
+body[data-role="admin"] #adminPanel .admin-section {
+  gap: 0.9rem;
+}
+
+body[data-role="admin"] #adminPanel .card {
+  padding: 1.25rem 1.35rem;
+}
+
+body[data-role="admin"] #adminPanel .admin-section-head {
+  padding: 0.2rem 0.25rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+}
+
+body[data-role="admin"] #adminPanel .admin-section-head p {
+  margin-top: 0.25rem;
+}
+
+body[data-role="admin"] #adminPanel .form-grid {
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+body[data-role="admin"] #adminPanel .form-grid .span-2,
+body[data-role="admin"] #adminPanel .form-grid button {
+  grid-column: span 1;
+}
+
+body[data-role="admin"] #adminPanel .row-between {
+  gap: 0.55rem;
+}
+
+body[data-role="admin"] #adminPanel .row-between > button,
+body[data-role="admin"] #adminPanel .row-between > .ghost {
+  width: auto;
+  min-width: 140px;
+}
+
+body[data-role="admin"] #adminPanel .admin-counts,
+body[data-role="admin"] #adminPanel .admin-alert-summary {
+  gap: 0.7rem;
+}
+
+body[data-role="admin"] #adminPanel .admin-filter-bar {
+  margin-bottom: 0.95rem;
+}
+
+body[data-role="admin"] #adminPanel .scroll-table {
+  margin-top: 0.6rem;
+}
+
+@media (min-width: 1100px) {
+  body[data-role="admin"] #adminPanel .admin-grid-2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.15rem;
+  }
+
+  body[data-role="admin"] #adminPanel #staffManagementCard form.form-grid,
+  body[data-role="admin"] #adminPanel #ingredientStockCard form.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body[data-role="admin"] #adminPanel #staffManagementCard form.form-grid button,
+  body[data-role="admin"] #adminPanel #ingredientStockCard form.form-grid button,
+  body[data-role="admin"] #adminPanel #staffManagementCard form.form-grid .span-2,
+  body[data-role="admin"] #adminPanel #ingredientStockCard form.form-grid .span-2 {
+    grid-column: span 2;
+  }
+}
